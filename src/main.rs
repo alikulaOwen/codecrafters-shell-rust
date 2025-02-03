@@ -10,4 +10,6 @@ fn main() {
     let stdin = io::stdin();
     let mut input = String::new();
     stdin.read_line(&mut input).unwrap();
+     // treating all input as invalid command for now
+    println!("{}: command not found", input.trim());
 }
