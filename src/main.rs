@@ -13,9 +13,17 @@ fn main() {
         stdin.read_line(&mut input).unwrap();
         // treating all input as invalid command for now
         
-        if input.trim() == "exit 0" {
-            break;
-        };
+        // if input.trim() == "exit 0" {
+        //     break;
+        // };
+        if input.trim().starts_with("echo"){
+            return println!("{}", input.trim().replace("echo", "").trim());
+        
+        }
+
+            
         println!("{}: command not found", input.trim());
+
+
     }
 }
