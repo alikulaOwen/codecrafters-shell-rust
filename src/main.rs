@@ -16,7 +16,7 @@ fn main() {
         // if input.trim() == "exit 0" {
         //     break;
         // };
-        if input.trim().starts_with("echo"){
+        if input.trim().starts_with("echo") {
             return println!("{}", input.trim().replace("echo", "").trim());
         
         }
