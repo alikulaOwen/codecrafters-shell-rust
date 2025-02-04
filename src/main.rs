@@ -26,6 +26,7 @@ fn main() {
                 let phrase = input.next().unwrap();
                 match phrase {
                     "echo" => println!("echo is a shell builtin"),
+                    "type" => println!("type is a shell builtin"),
                     "exit" => println!("exit is a shell builtin"),
                     _ => println!("{}: command not found", phrase),
                 }
