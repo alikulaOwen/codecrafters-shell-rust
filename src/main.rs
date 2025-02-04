@@ -1,5 +1,6 @@
 #[allow(unused_imports)]
 use std::io::{self, Write};
+use std::process::exit;
 
 fn main() {
     // Uncomment this block to pass the first stage
@@ -16,14 +17,11 @@ fn main() {
         // if input.trim() == "exit 0" {
         //     break;
         // };
-        if input.trim().starts_with("echo") {
-            println!("{}", input.trim().replace("echo", "").trim());
-            return;
-        
-        }
-
-            
-        println!("{}: command not found", input.trim());
+        match input.trim() {
+            "exit 0" => exit(0),
+            input if input.starts_with("echo ") => println!("{}", &input[5..]),
+            input => println!("{}: command not found", input),
+        };
 
 
     }
