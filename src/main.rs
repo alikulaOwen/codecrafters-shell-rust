@@ -46,6 +46,7 @@ fn main() {
             _ => {
                 if let Some(exe) = find_executable_in_path(command) {
                     let output = Command::new(exe)
+                        .arg(command)
                         .args(&args)
                         .output()
                         .expect("failed to execute process");
