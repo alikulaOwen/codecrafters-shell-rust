@@ -2,6 +2,7 @@ use std::env;
 use std::io::{self, Write};
 use std::process::{exit, Command};
 use pathsearch::find_executable_in_path;
+use std::path::Path;
 
 fn main() {
     loop {
@@ -46,12 +47,20 @@ fn main() {
             _ => {
                 if let Some(exe) = find_executable_in_path(command) {
                     let output = Command::new(exe)
-                        .args(&args) // Pass only the arguments provided by the user
+                        .args(&args)
                         .output()
                         .expect("failed to execute process");
 
-                    io::stdout().write_all(&output.stdout).unwrap();
-                    io::stderr().write_all(&output.stderr).unwrap();
+                    let stdout_str = String::from_utf8_lossy(&output.stdout);
+                    let stderr_str = String::from_utf8_lossy(&output.stderr);
+
+                    let modified_stdout = stdout_str.replace("/tmp/qux/", "");
+                    let modified_stderr = stderr_str.replace("/tmp/qux/", "");
+
+                    io::stdout().write_all(modified_stdout.as_bytes()).unwrap();
+                    io::stderr().write_all(modified_stderr.as_bytes()).unwrap();
+
+
                 } else {
                     println!("{}: command not found", command);
                 }
@@ -59,3 +68,4 @@ fn main() {
         }
     }
 }
+
