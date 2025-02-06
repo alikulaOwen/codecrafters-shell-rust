@@ -46,10 +46,8 @@ fn main() {
             }
             _ => {
                 if let Some(exe) = find_executable_in_path(command) {
-                    let program_name = Path::new(command).file_name().unwrap().to_str().unwrap();
                     let output = Command::new(exe)
-                        .arg(program_name) // Pass the program name as the first argument
-                        .args(&args) // Pass the rest of the arguments
+                        .args(&args) // Pass only the arguments provided by the user
                         .output()
                         .expect("failed to execute process");
 
