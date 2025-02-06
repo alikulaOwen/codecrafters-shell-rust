@@ -2,6 +2,7 @@ use std::env;
 use std::io::{self, Write};
 use std::process::{exit, Command};
 use pathsearch::find_executable_in_path;
+use std::path::Path;
 
 fn main() {
     loop {
@@ -45,8 +46,10 @@ fn main() {
             }
             _ => {
                 if let Some(exe) = find_executable_in_path(command) {
+                    let program_name = Path::new(command).file_name().unwrap().to_str().unwrap();
                     let output = Command::new(exe)
-                        .args(&args) // Pass only the arguments
+                        .arg(program_name) // Pass the program name as the first argument
+                        .args(&args) // Pass the rest of the arguments
                         .output()
                         .expect("failed to execute process");
 
