@@ -2,7 +2,6 @@ use std::env;
 use std::io::{self, Write};
 use std::process::{exit, Command};
 use pathsearch::find_executable_in_path;
-use std::path::Path;
 
 fn main() {
     loop {
