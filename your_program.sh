@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/sha
 #
 # Use this script to run your program LOCALLY.
 #
