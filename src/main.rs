@@ -1,6 +1,6 @@
 use std::env;
 use std::io::{self, Write};
-use std::process::exit;
+use std::process::{exit, Command};
 use pathsearch::find_executable_in_path;
 
 fn main() {
@@ -13,14 +13,16 @@ fn main() {
         stdin.read_line(&mut input).unwrap();
 
         const BUILTIN_CMDS: [&str; 3] = ["echo", "type", "exit"];
-        match input.trim() {
-            "exit 0" => exit(0),
-            input if input.starts_with("echo ") => println!("{}", &input[5..]),
-            input if input.starts_with("type") => {
-                let mut input = input.split_whitespace();
-                input.next();
-                let phrase = input.next().unwrap();
-                if BUILTIN_CMDS.contains(&phrase) {
+        let mut parts = input.trim().split_whitespace();
+        let command = parts.next().unwrap_or("");
+        let args: Vec<&str> = parts.collect();
+
+        match command {
+            "exit" => exit(0),
+            "echo" => println!("{}", args.join(" ")),
+            "type" => {
+                let phrase = args.get(0).unwrap_or(&"");
+                if BUILTIN_CMDS.contains(phrase) {
                     println!("{} is a shell builtin", phrase);
                 } else if let Some(exe) = find_executable_in_path(phrase) {
                     println!("{} is {}", phrase, exe.display());
@@ -41,7 +43,19 @@ fn main() {
                     }
                 }
             }
-            _ => println!("{}: command not found", input.trim()),
+            _ => {
+                if let Some(exe) = find_executable_in_path(command) {
+                    let output = Command::new(exe)
+                        .args(&args)
+                        .output()
+                        .expect("failed to execute process");
+
+                    io::stdout().write_all(&output.stdout).unwrap();
+                    io::stderr().write_all(&output.stderr).unwrap();
+                } else {
+                    println!("{}: command not found", command);
+                }
+            }
         }
     }
 }
