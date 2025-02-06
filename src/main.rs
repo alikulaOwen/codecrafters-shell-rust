@@ -45,8 +45,8 @@ fn main() {
                 }
             }
             _ => {
-                if let Some(exe) = find_executable_in_path(command) {
-                    let output = Command::new(exe)
+                if let Some(exe_path) = find_executable_in_path(command) {
+                    let output = Command::new(&exe_path)
                         .args(&args)
                         .output()
                         .expect("failed to execute process");
@@ -54,12 +54,13 @@ fn main() {
                     let stdout_str = String::from_utf8_lossy(&output.stdout);
                     let stderr_str = String::from_utf8_lossy(&output.stderr);
 
-                    let modified_stdout = stdout_str.replace("/tmp/qux/", "");
-                    let modified_stderr = stderr_str.replace("/tmp/qux/", "");
+                    let path_prefix = exe_path.parent().unwrap().to_str().unwrap();
+                    let modified_stdout = stdout_str.replace(&format!("{}/", path_prefix), "");
+                    let modified_stderr = stderr_str.replace(&format!("{}/", path_prefix), "");
+
 
                     io::stdout().write_all(modified_stdout.as_bytes()).unwrap();
                     io::stderr().write_all(modified_stderr.as_bytes()).unwrap();
-
 
                 } else {
                     println!("{}: command not found", command);
@@ -68,4 +69,3 @@ fn main() {
         }
     }
 }
-
