@@ -41,7 +41,7 @@ fn main() {
                     }
                 }
             }
-            _ => println!("Invalid command"),
+            _ => println!("{}: command not found", input.trim()),
         }
     }
 }
