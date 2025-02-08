@@ -49,10 +49,14 @@ fn main() {
             },
             "cd" => {
                 let new_dir = args.get(0).unwrap_or(&"");
+                
                 if new_dir.is_empty() {
                     let home_dir = env::var("HOME").unwrap_or_default();
                     env::set_current_dir(home_dir).unwrap();
-                } else {
+                } else if env::set_current_dir(new_dir).is_err() {
+                    println!("cd: {}: No such file or directory", new_dir);
+                    
+                }else {
                     env::set_current_dir(new_dir).unwrap();
                 }
             },
