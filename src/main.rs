@@ -117,11 +117,13 @@ fn main() {
                 }
             }
             "cat" => {
-                let file_path = args.get(0).unwrap_or(&"");
-                let file = std::fs::read_to_string(file_path);
-                match file {
-                    Ok(content) => println!("{}", content),
-                    Err(_) => eprintln!("cat: {}: No such file or directory", file_path),
+                
+                for file_path in args {
+                    let file = std::fs::read_to_string(file_path);
+                    match file {
+                        Ok(content) => println!("{}", content),
+                        Err(_) => eprintln!("cat: {}: No such file or directory", file_path),
+                    }
                 }
             }
             _ => {
