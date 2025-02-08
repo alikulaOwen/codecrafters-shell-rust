@@ -2,7 +2,6 @@ use std::env;
 use std::io::{self, Write};
 use std::process::{exit, Command};
 use pathsearch::find_executable_in_path;
-use std::path::Path;
 
 fn main() {
     loop {
@@ -43,7 +42,11 @@ fn main() {
                         println!("{}: not found", phrase);
                     }
                 }
-            }
+            },
+            "pwd" => {
+                let current_dir = env::current_dir().unwrap();
+                println!("{}", current_dir.display());
+            },
             _ => {
                 if let Some(exe_path) = find_executable_in_path(command) {
                     let output = Command::new(&exe_path)
