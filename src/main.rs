@@ -60,6 +60,13 @@ fn main() {
                     if new_dir == &".." {
                         let current_dir = env::current_dir().unwrap();
                         let parent_dir = current_dir.parent().unwrap();
+                        if current_dir.is_relative() {
+                            env::set_current_dir(parent_dir).unwrap();
+                        }else if parent_dir.is_relative() {
+                            let parent_dir = parent_dir.parent().unwrap();
+                            env::set_current_dir(parent_dir).unwrap();
+                            
+                        }
                         env::set_current_dir(parent_dir).unwrap();
                     }
                     env::set_current_dir(new_dir).unwrap();
