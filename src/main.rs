@@ -36,7 +36,6 @@ fn parse_input(input: &str) -> Vec<String> {
     tokens
 }
 
-
 fn main() {
     loop {
         print!("$ ");
@@ -56,10 +55,11 @@ fn main() {
         let command = &tokens[0];
         let args: Vec<&str> = tokens[1..].iter().map(|s| s.as_str()).collect();
 
-
         match command.as_str() {
             "exit" => exit(0),
-            "echo" => println!("{}", input[5..].trim()),
+            "echo" => {
+                println!("{}", args.join(" "));
+            }
             "type" => {
                 let phrase = args.get(0).unwrap_or(&"");
                 if BUILTIN_CMDS.contains(phrase) {
@@ -115,7 +115,7 @@ fn main() {
                         eprintln!("cd: {}: No such file or directory", new_dir);
                     }
                 }
-            },
+            }
             "cat" => {
                 let file_path = args.get(0).unwrap_or(&"");
                 let file = std::fs::read_to_string(file_path);
