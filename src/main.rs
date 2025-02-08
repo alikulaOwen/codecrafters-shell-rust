@@ -57,6 +57,11 @@ fn main() {
                     println!("cd: {}: No such file or directory", new_dir);
                     
                 }else {
+                    if new_dir == &".." {
+                        let current_dir = env::current_dir().unwrap();
+                        let parent_dir = current_dir.parent().unwrap();
+                        env::set_current_dir(parent_dir).unwrap();
+                    }
                     env::set_current_dir(new_dir).unwrap();
                 }
             },
