@@ -4,6 +4,39 @@ use std::io::{self, Write};
 use std::path::Path;
 use std::process::{exit, Command};
 
+fn parse_input(input: &str) -> Vec<String> {
+    let mut tokens = Vec::new();
+    let mut current_token = String::new();
+    let mut in_single_quotes = false;
+
+    for c in input.chars() {
+        match c {
+            '\'' if !in_single_quotes => {
+                in_single_quotes = true;
+            }
+            '\'' if in_single_quotes => {
+                in_single_quotes = false;
+                tokens.push(current_token.clone());
+                current_token.clear();
+            }
+            ' ' if !in_single_quotes => {
+                if !current_token.is_empty() {
+                    tokens.push(current_token.clone());
+                    current_token.clear();
+                }
+            }
+            _ => current_token.push(c),
+        }
+    }
+
+    if !current_token.is_empty() {
+        tokens.push(current_token);
+    }
+
+    tokens
+}
+
+
 fn main() {
     loop {
         print!("$ ");
@@ -14,11 +47,17 @@ fn main() {
         stdin.read_line(&mut input).unwrap();
 
         const BUILTIN_CMDS: [&str; 5] = ["echo", "type", "exit", "pwd", "cd"];
-        let mut parts = input.trim().split_whitespace();
-        let command = parts.next().unwrap_or("");
-        let args: Vec<&str> = parts.collect();
+        let tokens = parse_input(&input);
 
-        match command {
+        if tokens.is_empty() {
+            continue;
+        }
+
+        let command = &tokens[0];
+        let args: Vec<&str> = tokens[1..].iter().map(|s| s.as_str()).collect();
+
+
+        match command.as_str() {
             "exit" => exit(0),
             "echo" => println!("{}", args.join(" ")),
             "type" => {
