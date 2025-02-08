@@ -62,7 +62,7 @@ fn main() {
                     .trim_matches(|c| c == '\'' || c == ' ')
                     .to_string();
                 println!("{}", output);
-                println!("{}", args.join(" "));
+                // println!("{}", args.join(" "));
             }
             "type" => {
                 let phrase = args.get(0).unwrap_or(&"");
