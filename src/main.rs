@@ -58,11 +58,12 @@ fn main() {
         match command.as_str() {
             "exit" => exit(0),
             "echo" => {
-                let output = input[5..]
-                    .trim_matches(|c| c == '\'' || c == ' ')
-                    .to_string();
-                println!("{}", output);
-                // println!("{}", args.join(" "));
+                let mut output = String::new();
+                for arg in args {
+                    output.push_str(arg);
+                    output.push(' ');
+                }
+                println!("{}", output.trim_end());
             }
             "type" => {
                 let phrase = args.get(0).unwrap_or(&"");
