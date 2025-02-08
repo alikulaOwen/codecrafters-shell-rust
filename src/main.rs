@@ -1,8 +1,8 @@
+use pathsearch::find_executable_in_path;
 use std::env;
 use std::io::{self, Write};
 use std::path::Path;
 use std::process::{exit, Command};
-use pathsearch::find_executable_in_path;
 
 fn main() {
     loop {
@@ -43,35 +43,34 @@ fn main() {
                         println!("{}: not found", phrase);
                     }
                 }
-            },
+            }
             "pwd" => {
                 let current_dir = env::current_dir().unwrap();
                 println!("{}", current_dir.display());
-            },
+            }
             "cd" => {
                 let new_dir = args.get(0).unwrap_or(&"");
-               
-               
+
                 if new_dir.is_empty() {
                     let home_dir = env::var("HOME").unwrap_or_default();
                     env::set_current_dir(home_dir).unwrap();
-                } else if env::set_current_dir(new_dir).is_err() {
-                    println!("cd: {}: No such file or directory", new_dir);
-                    
-                }else {
+                } else {
                     let new_path = Path::new(new_dir);
                     let absolute_path = if new_path.is_relative() {
                         let current_dir = env::current_dir().unwrap();
-                        current_dir.join(new_path).canonicalize().unwrap_or(current_dir.join(new_path))
+                        current_dir
+                            .join(new_path)
+                            .canonicalize()
+                            .unwrap_or(current_dir.join(new_path))
                     } else {
                         new_path.to_path_buf()
                     };
-            
+
                     if let Err(_e) = env::set_current_dir(absolute_path) {
-                        println!("cd: {}: No such file or directory", new_dir);
+                        eprintln!("cd: {}: No such file or directory", new_dir);
                     }
                 }
-            },
+            }
             _ => {
                 if let Some(exe_path) = find_executable_in_path(command) {
                     let output = Command::new(&exe_path)
@@ -86,10 +85,8 @@ fn main() {
                     let modified_stdout = stdout_str.replace(&format!("{}/", path_prefix), "");
                     let modified_stderr = stderr_str.replace(&format!("{}/", path_prefix), "");
 
-
                     io::stdout().write_all(modified_stdout.as_bytes()).unwrap();
                     io::stderr().write_all(modified_stderr.as_bytes()).unwrap();
-
                 } else {
                     println!("{}: command not found", command);
                 }
