@@ -12,7 +12,7 @@ fn main() {
         let mut input = String::new();
         stdin.read_line(&mut input).unwrap();
 
-        const BUILTIN_CMDS: [&str; 3] = ["echo", "type", "exit"];
+        const BUILTIN_CMDS: [&str; 4] = ["echo", "type", "exit", "pwd"];
         let mut parts = input.trim().split_whitespace();
         let command = parts.next().unwrap_or("");
         let args: Vec<&str> = parts.collect();
