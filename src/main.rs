@@ -11,13 +11,8 @@ fn parse_input(input: &str) -> Vec<String> {
 
     for c in input.chars() {
         match c {
-            '\'' if !in_single_quotes => {
-                in_single_quotes = true;
-            }
-            '\'' if in_single_quotes => {
-                in_single_quotes = false;
-                tokens.push(current_token.clone());
-                current_token.clear();
+            '\'' => {
+                in_single_quotes = !in_single_quotes;
             }
             ' ' if !in_single_quotes => {
                 if !current_token.is_empty() {
