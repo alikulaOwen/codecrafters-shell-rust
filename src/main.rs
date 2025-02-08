@@ -55,7 +55,13 @@ fn main() {
                     let home_dir = env::var("HOME").unwrap_or_default();
                     env::set_current_dir(home_dir).unwrap();
                 } else {
-                    let new_path = Path::new(new_dir);
+                    let new_dir = if new_dir.starts_with("~") {
+                        let home_dir = env::var("HOME").unwrap_or_default();
+                        new_dir.replace("~", &home_dir)
+                    } else {
+                        new_dir.to_string()
+                    };
+                    let new_path = Path::new(&new_dir);
                     let absolute_path = if new_path.is_relative() {
                         let current_dir = env::current_dir().unwrap();
                         current_dir
