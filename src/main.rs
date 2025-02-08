@@ -49,7 +49,8 @@ fn main() {
             },
             "cd" => {
                 let new_dir = args.get(0).unwrap_or(&"");
-                
+                println!("This is {}", new_dir);
+               
                 if new_dir.is_empty() {
                     let home_dir = env::var("HOME").unwrap_or_default();
                     env::set_current_dir(home_dir).unwrap();
@@ -57,19 +58,20 @@ fn main() {
                     println!("cd: {}: No such file or directory", new_dir);
                     
                 }else {
-                    if new_dir == &".." {
-                        let current_dir = env::current_dir().unwrap();
-                        let parent_dir = current_dir.parent().unwrap();
-                        if current_dir.is_relative() {
-                            env::set_current_dir(parent_dir).unwrap();
-                        }else if parent_dir.is_relative() {
-                            let parent_dir = parent_dir.parent().unwrap();
-                            env::set_current_dir(parent_dir).unwrap();
-                            
-                        }
-                        env::set_current_dir(parent_dir).unwrap();
-                    }
-                    env::set_current_dir(new_dir).unwrap();
+                     let new_dir_vec: Vec<&str> = new_dir.split("/").collect();
+                      // iterate thru the vector and checking the directories
+                      // if .. is found, go back to the parent directory
+                      // if . is found, stay in the current directory
+                      if new_dir_vec.contains(&"..") {
+                          let current_dir = env::current_dir().unwrap();
+                          let parent_dir = current_dir.parent().unwrap();
+                          env::set_current_dir(parent_dir).unwrap();
+                      } else if new_dir_vec.contains(&".") {
+                          let current_dir = env::current_dir().unwrap();
+                          env::set_current_dir(current_dir).unwrap();
+                      } else {
+                          env::set_current_dir(new_dir).unwrap();
+                      }
                 }
             },
             _ => {
