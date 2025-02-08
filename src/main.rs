@@ -12,7 +12,7 @@ fn main() {
         let mut input = String::new();
         stdin.read_line(&mut input).unwrap();
 
-        const BUILTIN_CMDS: [&str; 4] = ["echo", "type", "exit", "pwd"];
+        const BUILTIN_CMDS: [&str; 5] = ["echo", "type", "exit", "pwd", "cd"];
         let mut parts = input.trim().split_whitespace();
         let command = parts.next().unwrap_or("");
         let args: Vec<&str> = parts.collect();
@@ -46,6 +46,15 @@ fn main() {
             "pwd" => {
                 let current_dir = env::current_dir().unwrap();
                 println!("{}", current_dir.display());
+            },
+            "cd" => {
+                let new_dir = args.get(0).unwrap_or(&"");
+                if new_dir.is_empty() {
+                    let home_dir = env::var("HOME").unwrap_or_default();
+                    env::set_current_dir(home_dir).unwrap();
+                } else {
+                    env::set_current_dir(new_dir).unwrap();
+                }
             },
             _ => {
                 if let Some(exe_path) = find_executable_in_path(command) {
