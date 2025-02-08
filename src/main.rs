@@ -118,14 +118,20 @@ fn main() {
             }
             "cat" => {
                 let mut output = String::new();
+                let mut has_error = false;
                 for file_path in args {
                     let file = std::fs::read_to_string(file_path);
                     match file {
                         Ok(content) => output.push_str(&content),
-                        Err(_) => eprintln!("cat: {}: No such file or directory", file_path),
+                        Err(_) => {
+                            eprintln!("cat: {}: No such file or directory", file_path);
+                            has_error = true;
+                        }
                     }
                 }
-                println!("{}", output);
+                if !has_error {
+                    println!("{}", output);
+                }
             }
             _ => {
                 if let Some(exe_path) = find_executable_in_path(command) {
