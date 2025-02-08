@@ -58,12 +58,8 @@ fn main() {
         match command.as_str() {
             "exit" => exit(0),
             "echo" => {
-                let mut output = String::new();
-                for arg in args {
-                    output.push_str(arg);
-                    output.push(' ');
-                }
-                println!("{}", output.trim_end());
+                let output = input[5..].split_whitespace().collect::<Vec<&str>>().join(" ");
+    println!("{}", output);
             }
             "type" => {
                 let phrase = args.get(0).unwrap_or(&"");
