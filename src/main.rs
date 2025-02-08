@@ -46,7 +46,7 @@ fn main() {
         let mut input = String::new();
         stdin.read_line(&mut input).unwrap();
 
-        const BUILTIN_CMDS: [&str; 5] = ["echo", "type", "exit", "pwd", "cd"];
+        const BUILTIN_CMDS: [&str; 6] = ["echo", "type", "exit", "pwd", "cd", "cat"];
         let tokens = parse_input(&input);
 
         if tokens.is_empty() {
@@ -114,6 +114,14 @@ fn main() {
                     if let Err(_e) = env::set_current_dir(absolute_path) {
                         eprintln!("cd: {}: No such file or directory", new_dir);
                     }
+                }
+            },
+            "cat" => {
+                let file_path = args.get(0).unwrap_or(&"");
+                let file = std::fs::read_to_string(file_path);
+                match file {
+                    Ok(content) => println!("{}", content),
+                    Err(_) => eprintln!("cat: {}: No such file or directory", file_path),
                 }
             }
             _ => {
