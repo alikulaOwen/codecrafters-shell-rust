@@ -1,5 +1,6 @@
 use std::env;
 use std::io::{self, Write};
+use std::path::Path;
 use std::process::{exit, Command};
 use pathsearch::find_executable_in_path;
 
@@ -58,20 +59,17 @@ fn main() {
                     println!("cd: {}: No such file or directory", new_dir);
                     
                 }else {
-                     let new_dir_vec: Vec<&str> = new_dir.split("/").collect();
-                      // iterate thru the vector and checking the directories
-                      // if .. is found, go back to the parent directory
-                      // if . is found, stay in the current directory
-                      if new_dir_vec.contains(&"..") {
-                          let current_dir = env::current_dir().unwrap();
-                          let parent_dir = current_dir.parent().unwrap();
-                          env::set_current_dir(parent_dir).unwrap();
-                      } else if new_dir_vec.contains(&".") {
-                          let current_dir = env::current_dir().unwrap();
-                          env::set_current_dir(current_dir).unwrap();
-                      } else {
-                          env::set_current_dir(new_dir).unwrap();
-                      }
+                    let new_path = Path::new(new_dir);
+                    let absolute_path = if new_path.is_relative() {
+                        let current_dir = env::current_dir().unwrap();
+                        current_dir.join(new_path).canonicalize().unwrap_or(current_dir.join(new_path))
+                    } else {
+                        new_path.to_path_buf()
+                    };
+            
+                    if let Err(_e) = env::set_current_dir(absolute_path) {
+                        println!("cd: {}: No such file or directory", new_dir);
+                    }
                 }
             },
             _ => {
