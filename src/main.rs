@@ -49,7 +49,7 @@ fn main() {
             },
             "cd" => {
                 let new_dir = args.get(0).unwrap_or(&"");
-                println!("This is {}", new_dir);
+               
                
                 if new_dir.is_empty() {
                     let home_dir = env::var("HOME").unwrap_or_default();
