@@ -59,7 +59,7 @@ fn main() {
 
         match command.as_str() {
             "exit" => exit(0),
-            "echo" => println!("{}", args.join(" ")),
+            "echo" => println!("{}", input[5..].trim()),
             "type" => {
                 let phrase = args.get(0).unwrap_or(&"");
                 if BUILTIN_CMDS.contains(phrase) {
