@@ -124,13 +124,18 @@ fn main() {
                 //     Err(_) => eprintln!("cat: {}: No such file or directory", file_path),
                 // }
                 // args are list of files dir i wnat to cat
+                let mut output = String::new();
                 for file_path in args {
-                    let file = std::fs::read_to_string(&file_path);
-                    match file {
-                        Ok(content) => println!("{}", content),
-                        Err(_) => eprintln!("cat: {}: No such file or directory", file_path),
+                    match std::fs::read_to_string(&file_path) {
+                        Ok(content) => {
+                            output.push_str(&content);
+                        }
+                        Err(_) => {
+                            eprintln!("cat: {}: No such file or directory", file_path);
+                        }
                     }
                 }
+                println!("{}", output);
             }
             _ => {
                 if let Some(exe_path) = find_executable_in_path(command) {
