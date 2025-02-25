@@ -126,7 +126,9 @@ fn main() {
                 // args are list of files dir i wnat to cat
                 let mut output = String::new();
                 for file_path in args {
+                    println!("file_path: {}", file_path);
                     match std::fs::read_to_string(&file_path) {
+                       
                         Ok(content) => {
                             output.push_str(&content);
                         }
