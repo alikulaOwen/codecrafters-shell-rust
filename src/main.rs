@@ -89,11 +89,20 @@ fn main() {
 
         // Handle output redirection tokens: ">" and "1>"
         let mut redirect_path: Option<String> = None;
+        // Handle append stdout tokens: ">>" and "1>>"
+        let mut append_redirect_path: Option<String> = None;
         // Handle stderr redirection token: "2>"
         let mut stderr_redirect_path: Option<String> = None;
         if let Some(pos) = tokens.iter().position(|t| t == ">" || t == "1>") {
             if pos + 1 < tokens.len() {
                 redirect_path = Some(tokens[pos + 1].clone());
+                tokens.remove(pos + 1);
+                tokens.remove(pos);
+            }
+        }
+        if let Some(pos) = tokens.iter().position(|t| t == ">>" || t == "1>>") {
+            if pos + 1 < tokens.len() {
+                append_redirect_path = Some(tokens[pos + 1].clone());
                 tokens.remove(pos + 1);
                 tokens.remove(pos);
             }
@@ -119,6 +128,11 @@ fn main() {
                 if let Some(path) = redirect_path {
                     // Echo traditionally appends a trailing newline
                     let _ = std::fs::write(path, format!("{}\n", output_str));
+                } else if let Some(path) = append_redirect_path {
+                    use std::io::Write as _;
+                    if let Ok(mut file) = std::fs::OpenOptions::new().create(true).append(true).open(path) {
+                        let _ = writeln!(file, "{}", output_str);
+                    }
                 } else {
                     println!("{}", output_str);
                 }
@@ -193,6 +207,11 @@ fn main() {
                 }
                 if let Some(path) = redirect_path {
                     let _ = std::fs::write(path, output);
+                } else if let Some(path) = append_redirect_path {
+                    use std::io::Write as _;
+                    if let Ok(mut file) = std::fs::OpenOptions::new().create(true).append(true).open(path) {
+                        let _ = write!(file, "{}", output);
+                    }
                 } else {
                     if output.ends_with('\n') {
                         print!("{}", output);
@@ -220,6 +239,11 @@ fn main() {
 
                     if let Some(path) = redirect_path {
                         let _ = std::fs::write(path, modified_stdout);
+                    } else if let Some(path) = append_redirect_path {
+                        use std::io::Write as _;
+                        if let Ok(mut file) = std::fs::OpenOptions::new().create(true).append(true).open(path) {
+                            let _ = write!(file, "{}", modified_stdout);
+                        }
                     } else {
                         io::stdout().write_all(modified_stdout.as_bytes()).unwrap();
                     }
