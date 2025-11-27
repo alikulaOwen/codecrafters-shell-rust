@@ -122,6 +122,10 @@ fn main() {
                 } else {
                     println!("{}", output_str);
                 }
+                // If stderr is redirected, ensure target file exists even though echo emits no stderr
+                if let Some(path) = stderr_redirect_path.clone() {
+                    let _ = std::fs::write(path, "");
+                }
             }
             "type" => {
                 let phrase = args.get(0).unwrap_or(&"");
