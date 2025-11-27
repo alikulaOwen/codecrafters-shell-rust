@@ -227,7 +227,7 @@ fn main() {
                     if let Ok(mut file) = std::fs::OpenOptions::new().create(true).append(true).open(path) {
                         let _ = write!(file, "{}", output);
                     }
-                } else {
+                } else if !output.is_empty() {
                     if output.ends_with('\n') {
                         print!("{}", output);
                     } else {
