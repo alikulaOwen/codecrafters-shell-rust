@@ -93,6 +93,8 @@ fn main() {
         let mut append_redirect_path: Option<String> = None;
         // Handle stderr redirection token: "2>"
         let mut stderr_redirect_path: Option<String> = None;
+        // Handle append stderr token: "2>>"
+        let mut stderr_append_path: Option<String> = None;
         if let Some(pos) = tokens.iter().position(|t| t == ">" || t == "1>") {
             if pos + 1 < tokens.len() {
                 redirect_path = Some(tokens[pos + 1].clone());
@@ -110,6 +112,13 @@ fn main() {
         if let Some(pos) = tokens.iter().position(|t| t == "2>") {
             if pos + 1 < tokens.len() {
                 stderr_redirect_path = Some(tokens[pos + 1].clone());
+                tokens.remove(pos + 1);
+                tokens.remove(pos);
+            }
+        }
+        if let Some(pos) = tokens.iter().position(|t| t == "2>>") {
+            if pos + 1 < tokens.len() {
+                stderr_append_path = Some(tokens[pos + 1].clone());
                 tokens.remove(pos + 1);
                 tokens.remove(pos);
             }
@@ -153,6 +162,10 @@ fn main() {
                     let mut found = false;
                     for path in paths {
                         let exe_path = path.join(phrase);
+                if let Some(path) = stderr_append_path.clone() {
+                    use std::io::Write as _;
+                    let _ = std::fs::OpenOptions::new().create(true).append(true).open(path);
+                }
                         if exe_path.exists() && exe_path.is_file() {
                             println!("{} is {}", phrase, exe_path.display());
                             found = true;
@@ -199,6 +212,8 @@ fn main() {
                             let msg = format!("cat: {}: No such file or directory\n", clean_path);
                             if stderr_redirect_path.is_some() {
                                 err_output.push_str(&msg);
+                            } else if stderr_append_path.is_some() {
+                                err_output.push_str(&msg);
                             } else {
                                 eprint!("{}", msg);
                             }
@@ -221,6 +236,11 @@ fn main() {
                 }
                 if let Some(path) = stderr_redirect_path {
                     let _ = std::fs::write(path, err_output);
+                } else if let Some(path) = stderr_append_path {
+                    use std::io::Write as _;
+                    if let Ok(mut file) = std::fs::OpenOptions::new().create(true).append(true).open(path) {
+                        let _ = write!(file, "{}", err_output);
+                    }
                 }
             }
             _ => {
@@ -249,6 +269,11 @@ fn main() {
                     }
                     if let Some(path) = stderr_redirect_path {
                         let _ = std::fs::write(path, modified_stderr);
+                    } else if let Some(path) = stderr_append_path {
+                        use std::io::Write as _;
+                        if let Ok(mut file) = std::fs::OpenOptions::new().create(true).append(true).open(path) {
+                            let _ = write!(file, "{}", modified_stderr);
+                        }
                     } else {
                         io::stderr().write_all(modified_stderr.as_bytes()).unwrap();
                     }
