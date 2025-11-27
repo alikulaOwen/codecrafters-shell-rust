@@ -87,12 +87,15 @@ fn main() {
         if input.contains('\t') {
             let before_tab = input.split('\t').next().unwrap_or("");
             let trimmed = before_tab.trim_end_matches(['\n', '\r']);
-            // Only attempt completion on the first token fragment
             let fragment = trimmed.split_whitespace().next().unwrap_or("");
             let candidates = ["echo", "exit"];
             if let Some(&completion) = candidates.iter().find(|c| c.starts_with(fragment)) {
-                // Print completed token followed by a space to mimic shell behavior
-                println!("{} ", completion);
+                // Print prompt and completed token followed by a space
+                println!("$ {} ", completion);
+            } else {
+                // If no match, just print the prompt again
+                print!("$ ");
+                io::stdout().flush().unwrap();
             }
             continue;
         }
