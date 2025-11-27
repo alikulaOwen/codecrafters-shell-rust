@@ -89,9 +89,18 @@ fn main() {
 
         // Handle output redirection tokens: ">" and "1>"
         let mut redirect_path: Option<String> = None;
+        // Handle stderr redirection token: "2>"
+        let mut stderr_redirect_path: Option<String> = None;
         if let Some(pos) = tokens.iter().position(|t| t == ">" || t == "1>") {
             if pos + 1 < tokens.len() {
                 redirect_path = Some(tokens[pos + 1].clone());
+                tokens.remove(pos + 1);
+                tokens.remove(pos);
+            }
+        }
+        if let Some(pos) = tokens.iter().position(|t| t == "2>") {
+            if pos + 1 < tokens.len() {
+                stderr_redirect_path = Some(tokens[pos + 1].clone());
                 tokens.remove(pos + 1);
                 tokens.remove(pos);
             }
@@ -163,17 +172,32 @@ fn main() {
             }
             "cat" => {
                 let mut output = String::new();
+                let mut err_output = String::new();
                 for file_path in args {
                     let clean_path = file_path.trim_end_matches(&['\n', '\r'][..]);
                     match std::fs::read_to_string(clean_path) {
                         Ok(content) => output.push_str(&content),
-                        Err(_) => eprintln!("cat: {}: No such file or directory", clean_path),
+                        Err(_) => {
+                            let msg = format!("cat: {}: No such file or directory\n", clean_path);
+                            if stderr_redirect_path.is_some() {
+                                err_output.push_str(&msg);
+                            } else {
+                                eprint!("{}", msg);
+                            }
+                        }
                     }
                 }
                 if let Some(path) = redirect_path {
                     let _ = std::fs::write(path, output);
                 } else {
-                    print!("{}", output);
+                    if output.ends_with('\n') {
+                        print!("{}", output);
+                    } else {
+                        println!("{}", output);
+                    }
+                }
+                if let Some(path) = stderr_redirect_path {
+                    let _ = std::fs::write(path, err_output);
                 }
             }
             _ => {
@@ -195,7 +219,11 @@ fn main() {
                     } else {
                         io::stdout().write_all(modified_stdout.as_bytes()).unwrap();
                     }
-                    io::stderr().write_all(modified_stderr.as_bytes()).unwrap();
+                    if let Some(path) = stderr_redirect_path {
+                        let _ = std::fs::write(path, modified_stderr);
+                    } else {
+                        io::stderr().write_all(modified_stderr.as_bytes()).unwrap();
+                    }
                 } else {
                     println!("{}: command not found", command);
                 }
