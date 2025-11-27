@@ -8,19 +8,29 @@ fn parse_input(input: &str) -> Vec<String> {
     let mut tokens = Vec::new();
     let mut current_token = String::new();
     let mut in_single_quotes = false;
+    let mut in_double_quotes = false;
 
     for c in input.chars() {
         match c {
-            '\'' => {
+            '\'' if !in_double_quotes => {
+              
                 in_single_quotes = !in_single_quotes;
             }
-            ' ' if !in_single_quotes => {
+            '"' if !in_single_quotes => {
+                
+                in_double_quotes = !in_double_quotes;
+            }
+            ' ' | '\t' if !in_single_quotes && !in_double_quotes => {
+                
                 if !current_token.is_empty() {
                     tokens.push(current_token.clone());
                     current_token.clear();
                 }
             }
-            _ => current_token.push(c),
+            _ => {
+                
+                current_token.push(c);
+            }
         }
     }
 
@@ -28,7 +38,7 @@ fn parse_input(input: &str) -> Vec<String> {
         tokens.push(current_token);
     }
 
-    // Remove trailing newline/carriage returns (only from line endings, not internal spaces)
+   
     for token in tokens.iter_mut() {
         while token.ends_with('\n') || token.ends_with('\r') {
             token.pop();
@@ -47,7 +57,7 @@ fn main() {
         let mut input = String::new();
         stdin.read_line(&mut input).unwrap();
 
-        // Stage-specific: exclude "cat" so `type cat` resolves to external executable
+        
         const BUILTIN_CMDS: [&str; 5] = ["echo", "type", "exit", "pwd", "cd"];
         let tokens = parse_input(&input);
 
