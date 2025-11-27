@@ -28,6 +28,13 @@ fn parse_input(input: &str) -> Vec<String> {
         tokens.push(current_token);
     }
 
+    // Remove trailing newline/carriage returns (only from line endings, not internal spaces)
+    for token in tokens.iter_mut() {
+        while token.ends_with('\n') || token.ends_with('\r') {
+            token.pop();
+        }
+    }
+
     tokens
 }
 
@@ -49,7 +56,6 @@ fn main() {
 
         let command = &tokens[0];
         let args: Vec<&str> = tokens[1..].iter().map(|s| s.as_str()).collect();
-
         match command.as_str() {
             "exit" => exit(0),
             "echo" => {
@@ -89,55 +95,34 @@ fn main() {
             }
             "cd" => {
                 let new_dir = args.get(0).unwrap_or(&"");
-
                 if new_dir.is_empty() {
                     let home_dir = env::var("HOME").unwrap_or_default();
-                    env::set_current_dir(home_dir).unwrap();
+                    if let Err(_) = env::set_current_dir(&home_dir) {
+                        eprintln!("cd: {}: Unable to change directory", home_dir);
+                    }
                 } else {
-                    let new_dir = if new_dir.starts_with("~") {
+                    let expanded = if new_dir.starts_with('~') {
                         let home_dir = env::var("HOME").unwrap_or_default();
-                        new_dir.replace("~", &home_dir)
+                        new_dir.replacen('~', &home_dir, 1)
                     } else {
                         new_dir.to_string()
                     };
-                    let new_path = Path::new(&new_dir);
-                    let absolute_path = if new_path.is_relative() {
-                        let current_dir = env::current_dir().unwrap();
-                        current_dir
-                            .join(new_path)
-                            .canonicalize()
-                            .unwrap_or(current_dir.join(new_path))
-                    } else {
-                        new_path.to_path_buf()
-                    };
-
-                    if let Err(_e) = env::set_current_dir(absolute_path) {
-                        eprintln!("cd: {}: No such file or directory", new_dir);
+                    let path = Path::new(&expanded);
+                    if let Err(_) = env::set_current_dir(path) {
+                        eprintln!("cd: {}: No such file or directory", expanded);
                     }
                 }
             }
             "cat" => {
-                // let file_path = args.get(0).unwrap_or(&"");
-                // let file = std::fs::read_to_string(file_path);
-                // match file {
-                //     Ok(content) => println!("{}", content),
-                //     Err(_) => eprintln!("cat: {}: No such file or directory", file_path),
-                // }
-                // args are list of files dir i wnat to cat
                 let mut output = String::new();
                 for file_path in args {
-                    println!("file_path: {}", file_path);
-                    match std::fs::read_to_string(&file_path) {
-                       
-                        Ok(content) => {
-                            output.push_str(&content);
-                        }
-                        Err(_) => {
-                            eprintln!("cat: {}: No such file or directory", file_path);
-                        }
+                    let clean_path = file_path.trim_end_matches(&['\n', '\r'][..]);
+                    match std::fs::read_to_string(clean_path) {
+                        Ok(content) => output.push_str(&content),
+                        Err(_) => eprintln!("cat: {}: No such file or directory", clean_path),
                     }
                 }
-                println!("{}", output);
+                print!("{}", output);
             }
             _ => {
                 if let Some(exe_path) = find_executable_in_path(command) {
