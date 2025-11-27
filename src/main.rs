@@ -85,7 +85,17 @@ fn main() {
 
         
         const BUILTIN_CMDS: [&str; 5] = ["echo", "type", "exit", "pwd", "cd"];
-        let tokens = parse_input(&input);
+        let mut tokens = parse_input(&input);
+
+        // Handle output redirection tokens: ">" and "1>"
+        let mut redirect_path: Option<String> = None;
+        if let Some(pos) = tokens.iter().position(|t| t == ">" || t == "1>") {
+            if pos + 1 < tokens.len() {
+                redirect_path = Some(tokens[pos + 1].clone());
+                tokens.remove(pos + 1);
+                tokens.remove(pos);
+            }
+        }
 
         if tokens.is_empty() {
             continue;
@@ -96,8 +106,13 @@ fn main() {
         match command.as_str() {
             "exit" => exit(0),
             "echo" => {
-           
-                println!("{}", args.join(" "));
+                let output_str = args.join(" ");
+                if let Some(path) = redirect_path {
+                    // Echo traditionally appends a trailing newline
+                    let _ = std::fs::write(path, format!("{}\n", output_str));
+                } else {
+                    println!("{}", output_str);
+                }
             }
             "type" => {
                 let phrase = args.get(0).unwrap_or(&"");
@@ -155,7 +170,11 @@ fn main() {
                         Err(_) => eprintln!("cat: {}: No such file or directory", clean_path),
                     }
                 }
-                print!("{}", output);
+                if let Some(path) = redirect_path {
+                    let _ = std::fs::write(path, output);
+                } else {
+                    print!("{}", output);
+                }
             }
             _ => {
                 if let Some(exe_path) = find_executable_in_path(command) {
@@ -171,7 +190,11 @@ fn main() {
                     let modified_stdout = stdout_str.replace(&format!("{}/", path_prefix), "");
                     let modified_stderr = stderr_str.replace(&format!("{}/", path_prefix), "");
 
-                    io::stdout().write_all(modified_stdout.as_bytes()).unwrap();
+                    if let Some(path) = redirect_path {
+                        let _ = std::fs::write(path, modified_stdout);
+                    } else {
+                        io::stdout().write_all(modified_stdout.as_bytes()).unwrap();
+                    }
                     io::stderr().write_all(modified_stderr.as_bytes()).unwrap();
                 } else {
                     println!("{}: command not found", command);
