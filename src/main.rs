@@ -114,22 +114,6 @@ fn main() {
         let input = rl.readline("$ ");
         match input {
             Ok(line) => {
-                // TAB completion for builtins (echo, exit) on the first token
-                // Detect completion by counting spaces after the first token (simulate TAB)
-                let trimmed_input = line.trim_end_matches(['\n', '\r']);
-                let mut parts = trimmed_input.split_whitespace();
-                let fragment = parts.next().unwrap_or("");
-                let after_fragment = trimmed_input.get(fragment.len()..).unwrap_or("");
-                let space_count = after_fragment.chars().filter(|&c| c == ' ').count();
-                if space_count >= 2 {
-                    let candidates = ["echo", "exit"];
-                    if let Some(&completion) = candidates.iter().find(|c| c.starts_with(fragment)) {
-                        print!("\r$ {} ", completion);
-                        io::stdout().flush().unwrap();
-                        continue;
-                    }
-                }
-
                 const BUILTIN_CMDS: [&str; 5] = ["echo", "type", "exit", "pwd", "cd"];
                 let mut tokens = parse_input(&line);
 
