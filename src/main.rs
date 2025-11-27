@@ -10,7 +10,8 @@ fn parse_input(input: &str) -> Vec<String> {
     let mut in_single_quotes = false;
     let mut in_double_quotes = false;
 
-    for c in input.chars() {
+    let mut chars = input.chars().peekable();
+    while let Some(c) = chars.next() {
         match c {
             '\'' if !in_double_quotes => {
               
@@ -19,6 +20,12 @@ fn parse_input(input: &str) -> Vec<String> {
             '"' if !in_single_quotes => {
                 
                 in_double_quotes = !in_double_quotes;
+            }
+            '\\' if !in_single_quotes && !in_double_quotes => {
+                // Backslash escaping outside quotes: consume next char literally
+                if let Some(next) = chars.next() {
+                    current_token.push(next);
+                }
             }
             ' ' | '\t' if !in_single_quotes && !in_double_quotes => {
                 
@@ -70,12 +77,8 @@ fn main() {
         match command.as_str() {
             "exit" => exit(0),
             "echo" => {
-                let mut output = String::new();
-                for arg in args {
-                    output.push_str(arg);
-                    output.push(' ');
-                }
-                println!("{}", output.trim_end());
+           
+                println!("{}", args.join(" "));
             }
             "type" => {
                 let phrase = args.get(0).unwrap_or(&"");
