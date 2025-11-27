@@ -83,6 +83,20 @@ fn main() {
         let mut input = String::new();
         stdin.read_line(&mut input).unwrap();
 
+        // Handle simple TAB completion for builtins (echo, exit) on the first token
+        if input.contains('\t') {
+            let before_tab = input.split('\t').next().unwrap_or("");
+            let trimmed = before_tab.trim_end_matches(['\n', '\r']);
+            // Only attempt completion on the first token fragment
+            let fragment = trimmed.split_whitespace().next().unwrap_or("");
+            let candidates = ["echo", "exit"];
+            if let Some(&completion) = candidates.iter().find(|c| c.starts_with(fragment)) {
+                // Print completed token followed by a space to mimic shell behavior
+                println!("{} ", completion);
+            }
+            continue;
+        }
+
         
         const BUILTIN_CMDS: [&str; 5] = ["echo", "type", "exit", "pwd", "cd"];
         let mut tokens = parse_input(&input);
