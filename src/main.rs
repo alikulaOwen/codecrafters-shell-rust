@@ -21,8 +21,27 @@ fn parse_input(input: &str) -> Vec<String> {
                 
                 in_double_quotes = !in_double_quotes;
             }
+            '\\' if in_double_quotes => {
+             
+                if let Some(&next) = chars.peek() {
+                    match next {
+                        '"' | '\\' => {
+                            chars.next();
+                            current_token.push(next);
+                        }
+                        _ => {
+                         
+                            current_token.push('\\');
+                            chars.next();
+                            current_token.push(next);
+                        }
+                    }
+                } else {
+                    current_token.push('\\');
+                }
+            }
             '\\' if !in_single_quotes && !in_double_quotes => {
-                // Backslash escaping outside quotes: consume next char literally
+                
                 if let Some(next) = chars.next() {
                     current_token.push(next);
                 }
