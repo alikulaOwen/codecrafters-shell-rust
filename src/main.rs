@@ -47,7 +47,8 @@ fn main() {
         let mut input = String::new();
         stdin.read_line(&mut input).unwrap();
 
-        const BUILTIN_CMDS: [&str; 6] = ["echo", "type", "exit", "pwd", "cd", "cat"];
+        // Stage-specific: exclude "cat" so `type cat` resolves to external executable
+        const BUILTIN_CMDS: [&str; 5] = ["echo", "type", "exit", "pwd", "cd"];
         let tokens = parse_input(&input);
 
         if tokens.is_empty() {
