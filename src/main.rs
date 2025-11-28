@@ -194,6 +194,79 @@ fn parse_input(input: &str) -> Vec<String> {
     tokens
 }
 
+fn execute_pipeline(cmd1_tokens: &[String], cmd2_tokens: &[String]) {
+    use std::process::Stdio;
+    
+    if cmd1_tokens.is_empty() || cmd2_tokens.is_empty() {
+        eprintln!("Invalid pipeline: empty command");
+        return;
+    }
+
+    let cmd1 = &cmd1_tokens[0];
+    let args1: Vec<&str> = cmd1_tokens[1..].iter().map(|s| s.as_str()).collect();
+    
+    let cmd2 = &cmd2_tokens[0];
+    let args2: Vec<&str> = cmd2_tokens[1..].iter().map(|s| s.as_str()).collect();
+
+    // Find executables for both commands
+    let exe1 = match find_executable_in_path(cmd1) {
+        Some(path) => path,
+        None => {
+            eprintln!("{}: command not found", cmd1);
+            return;
+        }
+    };
+
+    let exe2 = match find_executable_in_path(cmd2) {
+        Some(path) => path,
+        None => {
+            eprintln!("{}: command not found", cmd2);
+            return;
+        }
+    };
+
+    // Spawn first command with piped stdout
+    let mut child1 = match Command::new(&exe1)
+        .args(&args1)
+        .stdout(Stdio::piped())
+        .spawn()
+    {
+        Ok(child) => child,
+        Err(e) => {
+            eprintln!("Failed to execute {}: {}", cmd1, e);
+            return;
+        }
+    };
+
+    // Take the stdout from the first command
+    let stdout1 = match child1.stdout.take() {
+        Some(stdout) => stdout,
+        None => {
+            eprintln!("Failed to capture stdout from {}", cmd1);
+            let _ = child1.kill();
+            return;
+        }
+    };
+
+    // Spawn second command with first command's stdout as stdin
+    let mut child2 = match Command::new(&exe2)
+        .args(&args2)
+        .stdin(stdout1)
+        .spawn()
+    {
+        Ok(child) => child,
+        Err(e) => {
+            eprintln!("Failed to execute {}: {}", cmd2, e);
+            let _ = child1.kill();
+            return;
+        }
+    };
+
+    // Wait for both processes to complete
+    let _ = child1.wait();
+    let _ = child2.wait();
+}
+
 fn main() {
     let config = Config::builder()
         .completion_type(CompletionType::List)
@@ -205,7 +278,25 @@ fn main() {
         match input {
             Ok(line) => {
                 const BUILTIN_CMDS: [&str; 5] = ["echo", "type", "exit", "pwd", "cd"];
-                let mut tokens = parse_input(&line);
+                let tokens = parse_input(&line);
+
+                if tokens.is_empty() {
+                    continue;
+                }
+
+                // Check for pipeline operator
+                if let Some(pipe_pos) = tokens.iter().position(|t| t == "|") {
+                    if pipe_pos == 0 || pipe_pos == tokens.len() - 1 {
+                        eprintln!("Invalid pipeline syntax");
+                        continue;
+                    }
+                    let cmd1_tokens: Vec<String> = tokens[..pipe_pos].to_vec();
+                    let cmd2_tokens: Vec<String> = tokens[pipe_pos + 1..].to_vec();
+                    execute_pipeline(&cmd1_tokens, &cmd2_tokens);
+                    continue;
+                }
+
+                let mut tokens = tokens; // Make mutable for redirection handling
 
                 // Handle output redirection tokens: ">" and "1>"
                 let mut redirect_path: Option<String> = None;
