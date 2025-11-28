@@ -74,18 +74,26 @@ impl Completer for BuiltinCompleter {
                 replacement: format!("{} ", file_name),
             });
         }
-        // Double TAB logic
-        if external_matches.len() > 1 && matches.iter().all(|p| p.replacement.starts_with(fragment)) {
+
+        // Longest common prefix completion logic
+        if external_matches.len() > 1 {
             let mut tab_count = 0;
             TAB_COUNT.with(|c| {
                 tab_count = *c.borrow();
                 *c.borrow_mut() += 1;
             });
-            if tab_count == 0 {
+            let lcp = longest_common_prefix(&external_matches);
+            if lcp.len() > fragment.len() {
+                // Complete to longest common prefix
+                return Ok((0, vec![Pair {
+                    display: format!("{} ", lcp),
+                    replacement: format!("{} ", lcp),
+                }]));
+            } else if tab_count == 1 {
                 print!("\x07");
                 std::io::stdout().flush().ok();
                 return Ok((0, Vec::new()));
-            } else if tab_count == 1 {
+            } else if tab_count == 2 {
                 println!();
                 let mut sorted_matches = external_matches.clone();
                 sorted_matches.sort();
@@ -107,6 +115,24 @@ impl Completer for BuiltinCompleter {
             std::io::stdout().flush().ok();
         }
         Ok((0, matches))
+    fn longest_common_prefix(strings: &[String]) -> String {
+        if strings.is_empty() {
+            return String::new();
+        }
+        let mut prefix = strings[0].clone();
+        for s in strings.iter().skip(1) {
+            let mut i = 0;
+            let min_len = std::cmp::min(prefix.len(), s.len());
+            while i < min_len && prefix.as_bytes()[i] == s.as_bytes()[i] {
+                i += 1;
+            }
+            prefix.truncate(i);
+            if prefix.is_empty() {
+                break;
+            }
+        }
+        prefix
+    }
     }
 }
 
