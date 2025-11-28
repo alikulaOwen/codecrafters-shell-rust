@@ -9,6 +9,11 @@ use std::path::Path;
 use std::process::{exit, Command};
 
 struct BuiltinCompleter;
+use std::cell::RefCell;
+
+thread_local! {
+    static TAB_COUNT: RefCell<u8> = RefCell::new(0);
+}
 
 impl Completer for BuiltinCompleter {
     type Candidate = Pair;
@@ -31,6 +36,7 @@ impl Completer for BuiltinCompleter {
             }
         }
         // External executables in PATH
+        let mut external_matches = Vec::new();
         if let Ok(path_var) = std::env::var("PATH") {
             for dir in path_var.split(':') {
                 let path = std::path::Path::new(dir);
@@ -40,25 +46,18 @@ impl Completer for BuiltinCompleter {
                         let file_path = entry.path();
                         if let Some(file_name) = file_path.file_name().and_then(|n| n.to_str()) {
                             if file_name.starts_with(fragment) {
-                                // Only add if executable
                                 #[cfg(unix)]
                                 {
                                     use std::os::unix::fs::PermissionsExt;
                                     if let Ok(meta) = entry.metadata() {
                                         if meta.permissions().mode() & 0o111 != 0 {
-                                            matches.push(Pair {
-                                                display: format!("{} ", file_name),
-                                                replacement: format!("{} ", file_name),
-                                            });
+                                            external_matches.push(file_name.to_string());
                                         }
                                     }
                                 }
                                 #[cfg(not(unix))]
                                 {
-                                    matches.push(Pair {
-                                        display: format!("{} ", file_name),
-                                        replacement: format!("{} ", file_name),
-                                    });
+                                    external_matches.push(file_name.to_string());
                                 }
                             }
                         }
@@ -66,8 +65,42 @@ impl Completer for BuiltinCompleter {
                 }
             }
         }
+        // Remove duplicates
+        let mut seen = std::collections::HashSet::new();
+        external_matches.retain(|x| seen.insert(x.clone()));
+        for file_name in &external_matches {
+            matches.push(Pair {
+                display: format!("{} ", file_name),
+                replacement: format!("{} ", file_name),
+            });
+        }
+        // Double TAB logic
+        if external_matches.len() > 1 && matches.iter().all(|p| p.replacement.starts_with(fragment)) {
+            let mut tab_count = 0;
+            TAB_COUNT.with(|c| {
+                tab_count = *c.borrow();
+                *c.borrow_mut() += 1;
+            });
+            if tab_count == 0 {
+                print!("\x07");
+                std::io::stdout().flush().ok();
+                return Ok((0, Vec::new()));
+            } else if tab_count == 1 {
+                println!();
+                for (i, name) in external_matches.iter().enumerate() {
+                    if i > 0 { print!("  "); }
+                    print!("{}", name);
+                }
+                println!();
+                print!("$ {}", fragment);
+                std::io::stdout().flush().ok();
+                TAB_COUNT.with(|c| *c.borrow_mut() = 0);
+                return Ok((0, Vec::new()));
+            }
+        } else {
+            TAB_COUNT.with(|c| *c.borrow_mut() = 0);
+        }
         if matches.is_empty() {
-            // Ring bell if no completion
             print!("\x07");
             std::io::stdout().flush().ok();
         }
