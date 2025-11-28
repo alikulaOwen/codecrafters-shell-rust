@@ -1,3 +1,21 @@
+fn longest_common_prefix(strings: &[String]) -> String {
+    if strings.is_empty() {
+        return String::new();
+    }
+    let mut prefix = strings[0].clone();
+    for s in strings.iter().skip(1) {
+        let mut i = 0;
+        let min_len = std::cmp::min(prefix.len(), s.len());
+        while i < min_len && prefix.as_bytes()[i] == s.as_bytes()[i] {
+            i += 1;
+        }
+        prefix.truncate(i);
+        if prefix.is_empty() {
+            break;
+        }
+    }
+    prefix
+}
 use pathsearch::find_executable_in_path;
 use rustyline::completion::{Completer, Pair};
 use rustyline::{Editor, Helper, Context};
@@ -114,26 +132,10 @@ impl Completer for BuiltinCompleter {
             print!("\x07");
             std::io::stdout().flush().ok();
         }
-        Ok((0, matches))
-    fn longest_common_prefix(strings: &[String]) -> String {
-        if strings.is_empty() {
-            return String::new();
-        }
-        let mut prefix = strings[0].clone();
-        for s in strings.iter().skip(1) {
-            let mut i = 0;
-            let min_len = std::cmp::min(prefix.len(), s.len());
-            while i < min_len && prefix.as_bytes()[i] == s.as_bytes()[i] {
-                i += 1;
-            }
-            prefix.truncate(i);
-            if prefix.is_empty() {
-                break;
-            }
-        }
-        prefix
+        return Ok((0, matches));
     }
-    }
+
+// ...existing code...
 }
 
 impl Hinter for BuiltinCompleter {
