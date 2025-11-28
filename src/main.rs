@@ -120,6 +120,7 @@ impl Completer for BuiltinCompleter {
                     print!("{}", name);
                 }
                 println!();
+                // Reprint prompt with original fragment, not last match
                 print!("$ {}", fragment);
                 std::io::stdout().flush().ok();
                 TAB_COUNT.with(|c| *c.borrow_mut() = 0);
