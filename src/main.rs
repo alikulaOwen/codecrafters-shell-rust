@@ -104,8 +104,8 @@ impl Completer for BuiltinCompleter {
             if lcp.len() > fragment.len() {
                 // Complete to longest common prefix
                 return Ok((0, vec![Pair {
-                    display: format!("{} ", lcp),
-                    replacement: format!("{} ", lcp),
+                    display: lcp.clone(),
+                    replacement: lcp,
                 }]));
             } else if tab_count == 1 {
                 print!("\x07");
