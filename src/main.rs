@@ -18,6 +18,7 @@ fn longest_common_prefix(strings: &[String]) -> String {
 }
 use pathsearch::find_executable_in_path;
 use rustyline::completion::{Completer, Pair};
+use rustyline::config::{Config, CompletionType};
 use rustyline::{Editor, Helper, Context};
 use rustyline::hint::Hinter;
 use rustyline::highlight::Highlighter;
@@ -43,18 +44,16 @@ impl Completer for BuiltinCompleter {
     ) -> Result<(usize, Vec<Pair>), rustyline::error::ReadlineError> {
         let candidates = ["echo", "exit"];
         let fragment = &line[..pos];
-        let mut matches = Vec::new();
+        let mut all_matches = Vec::new();
+        
         // Builtins
         for &cmd in &candidates {
             if cmd.starts_with(fragment) {
-                matches.push(Pair {
-                    display: format!("{} ", cmd),
-                    replacement: format!("{} ", cmd),
-                });
+                all_matches.push(cmd.to_string());
             }
         }
+        
         // External executables in PATH
-        let mut external_matches = Vec::new();
         if let Ok(path_var) = std::env::var("PATH") {
             for dir in path_var.split(':') {
                 let path = std::path::Path::new(dir);
@@ -69,13 +68,13 @@ impl Completer for BuiltinCompleter {
                                     use std::os::unix::fs::PermissionsExt;
                                     if let Ok(meta) = entry.metadata() {
                                         if meta.permissions().mode() & 0o111 != 0 {
-                                            external_matches.push(file_name.to_string());
+                                            all_matches.push(file_name.to_string());
                                         }
                                     }
                                 }
                                 #[cfg(not(unix))]
                                 {
-                                    external_matches.push(file_name.to_string());
+                                    all_matches.push(file_name.to_string());
                                 }
                             }
                         }
@@ -84,16 +83,42 @@ impl Completer for BuiltinCompleter {
             }
         }
 
+        // Remove duplicates and sort
         let mut seen = std::collections::HashSet::new();
-        external_matches.retain(|x| seen.insert(x.clone()));
-        for file_name in &external_matches {
-            matches.push(Pair {
-                display: format!("{} ", file_name),
-                replacement: format!("{} ", file_name),
-            });
+        all_matches.retain(|x| seen.insert(x.clone()));
+        all_matches.sort();
+
+        if all_matches.is_empty() {
+            return Ok((0, vec![]));
         }
-        // ...existing completion logic (longest common prefix, tab count, etc.)
-        Ok((0, matches))
+
+        // Find the longest common prefix
+        let common_prefix = longest_common_prefix(&all_matches);
+        
+        // If the common prefix is the same as the fragment, there's nothing to complete
+        // But we still return all matches so they can be displayed on double-TAB
+        if common_prefix == fragment {
+            let result: Vec<Pair> = all_matches.iter().map(|m| Pair {
+                display: m.clone(),
+                replacement: m.clone(),
+            }).collect();
+            return Ok((0, result));
+        }
+        
+        // There's a common prefix beyond the fragment - complete to it
+        // Add trailing space only if there's exactly one match
+        let completion = if all_matches.len() == 1 {
+            format!("{} ", common_prefix)
+        } else {
+            common_prefix.clone()
+        };
+        
+        let result = vec![Pair {
+            display: completion.clone(),
+            replacement: completion,
+        }];
+
+        Ok((0, result))
     }
     }
 
@@ -170,7 +195,10 @@ fn parse_input(input: &str) -> Vec<String> {
 }
 
 fn main() {
-    let mut rl = Editor::new();
+    let config = Config::builder()
+        .completion_type(CompletionType::List)
+        .build();
+    let mut rl = Editor::with_config(config);
     rl.set_helper(Some(BuiltinCompleter));
     loop {
         let input = rl.readline("$ ");
