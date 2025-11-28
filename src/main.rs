@@ -103,28 +103,31 @@ impl Completer for BuiltinCompleter {
             let lcp = longest_common_prefix(&external_matches);
             if lcp.len() > fragment.len() {
                 // Complete to longest common prefix
+                TAB_COUNT.with(|c| *c.borrow_mut() = 0);
                 return Ok((0, vec![Pair {
                     display: lcp.clone(),
                     replacement: lcp,
                 }]));
-            } else if tab_count == 1 {
-                print!("\x07");
-                std::io::stdout().flush().ok();
-                return Ok((0, Vec::new()));
-            } else if tab_count == 2 {
-                println!();
-                let mut sorted_matches = external_matches.clone();
-                sorted_matches.sort();
-                for (i, name) in sorted_matches.iter().enumerate() {
-                    if i > 0 { print!("  "); }
-                    print!("{}", name);
+            } else {
+                if tab_count == 1 {
+                    print!("\x07");
+                    std::io::stdout().flush().ok();
+                    return Ok((0, Vec::new()));
+                } else if tab_count == 2 {
+                    println!();
+                    let mut sorted_matches = external_matches.clone();
+                    sorted_matches.sort();
+                    for (i, name) in sorted_matches.iter().enumerate() {
+                        if i > 0 { print!("  "); }
+                        print!("{}", name);
+                    }
+                    println!();
+                    // Reprint prompt with original fragment, not last match
+                    print!("$ {}", fragment);
+                    std::io::stdout().flush().ok();
+                    TAB_COUNT.with(|c| *c.borrow_mut() = 0);
+                    return Ok((0, Vec::new()));
                 }
-                println!();
-                // Reprint prompt with original fragment, not last match
-                print!("$ {}", fragment);
-                std::io::stdout().flush().ok();
-                TAB_COUNT.with(|c| *c.borrow_mut() = 0);
-                return Ok((0, Vec::new()));
             }
         } else {
             TAB_COUNT.with(|c| *c.borrow_mut() = 0);
