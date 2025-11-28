@@ -95,11 +95,10 @@ impl Completer for BuiltinCompleter {
 
         // Longest common prefix completion logic
         if external_matches.len() > 1 {
+            // Track tab presses per fragment
             let mut tab_count = 0;
-            TAB_COUNT.with(|c| {
-                tab_count = *c.borrow();
-                *c.borrow_mut() += 1;
-            });
+            let mut last_fragment = String::new();
+
             let lcp = longest_common_prefix(&external_matches);
             if lcp.len() > fragment.len() {
                 // Complete to longest common prefix
@@ -139,7 +138,6 @@ impl Completer for BuiltinCompleter {
         return Ok((0, matches));
     }
 
-// ...existing code...
 }
 
 impl Hinter for BuiltinCompleter {
