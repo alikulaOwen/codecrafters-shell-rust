@@ -194,6 +194,79 @@ fn parse_input(input: &str) -> Vec<String> {
     tokens
 }
 
+fn run_builtin(
+    command: &str,
+    args: &[&str],
+    stdout: &mut dyn std::io::Write,
+    stderr: &mut dyn std::io::Write,
+) -> bool {
+    const BUILTIN_CMDS: [&str; 5] = ["echo", "type", "exit", "pwd", "cd"];
+
+    match command {
+        "exit" => exit(0),
+        "echo" => {
+            let output = args.join(" ");
+            let _ = writeln!(stdout, "{}", output);
+            true
+        }
+        "type" => {
+            let phrase = args.get(0).unwrap_or(&"");
+            if BUILTIN_CMDS.contains(phrase) {
+                let _ = writeln!(stdout, "{} is a shell builtin", phrase);
+            } else if let Some(exe) = find_executable_in_path(phrase) {
+                let _ = writeln!(stdout, "{} is {}", phrase, exe.display());
+            } else {
+                let _ = writeln!(stdout, "{}: not found", phrase);
+            }
+            true
+        }
+        "pwd" => {
+            if let Ok(current_dir) = env::current_dir() {
+                let _ = writeln!(stdout, "{}", current_dir.display());
+            }
+            true
+        }
+        "cd" => {
+            let new_dir = args.get(0).unwrap_or(&"");
+            let path = if new_dir.is_empty() {
+                env::var("HOME").unwrap_or_default()
+            } else if new_dir.starts_with('~') {
+                let home_dir = env::var("HOME").unwrap_or_default();
+                new_dir.replacen('~', &home_dir, 1)
+            } else {
+                new_dir.to_string()
+            };
+            
+            if let Err(_) = env::set_current_dir(&path) {
+                let _ = writeln!(stderr, "cd: {}: No such file or directory", path);
+            }
+            true
+        }
+        "cat" => {
+            let mut output = String::new();
+            let mut err_output = String::new();
+            for file_path in args {
+                let clean_path = file_path.trim_end_matches(&['\n', '\r'][..]);
+                match std::fs::read_to_string(clean_path) {
+                    Ok(content) => output.push_str(&content),
+                    Err(_) => {
+                        let msg = format!("cat: {}: No such file or directory\n", clean_path);
+                        err_output.push_str(&msg);
+                    }
+                }
+            }
+            if !output.is_empty() {
+                let _ = write!(stdout, "{}", output);
+            }
+            if !err_output.is_empty() {
+                let _ = write!(stderr, "{}", err_output);
+            }
+            true
+        }
+        _ => false,
+    }
+}
+
 fn execute_pipeline(cmd1_tokens: &[String], cmd2_tokens: &[String]) {
     use std::process::Stdio;
     
@@ -208,63 +281,96 @@ fn execute_pipeline(cmd1_tokens: &[String], cmd2_tokens: &[String]) {
     let cmd2 = &cmd2_tokens[0];
     let args2: Vec<&str> = cmd2_tokens[1..].iter().map(|s| s.as_str()).collect();
 
-    // Find executables for both commands
-    let exe1 = match find_executable_in_path(cmd1) {
-        Some(path) => path,
-        None => {
+    // Handle first command (Builtin or External)
+    let output1_opt: Option<Vec<u8>> = if run_builtin(cmd1, &args1, &mut Vec::new(), &mut Vec::new()) {
+        // It's a builtin. Capture output.
+        let mut capture = Vec::new();
+        run_builtin(cmd1, &args1, &mut capture, &mut std::io::stderr());
+        Some(capture)
+    } else {
+        None
+    };
+
+    let child1_opt = if output1_opt.is_none() {
+        // External command
+        if let Some(exe1) = find_executable_in_path(cmd1) {
+            match Command::new(&exe1)
+                .args(&args1)
+                .stdout(Stdio::piped())
+                .spawn()
+            {
+                Ok(child) => Some(child),
+                Err(e) => {
+                    eprintln!("Failed to execute {}: {}", cmd1, e);
+                    return;
+                }
+            }
+        } else {
             eprintln!("{}: command not found", cmd1);
             return;
         }
+    } else {
+        None
     };
 
-    let exe2 = match find_executable_in_path(cmd2) {
-        Some(path) => path,
-        None => {
+    // Handle second command (Builtin or External)
+    // It needs input from cmd1
+    
+    // If cmd2 is builtin
+    if run_builtin(cmd2, &args2, &mut Vec::new(), &mut Vec::new()) {
+        // Builtins in this shell don't really read stdin (except maybe cat if we implemented it, but we didn't implement stdin for cat)
+        // So we just run it.
+        // But we must consume/wait for cmd1.
+        
+        if let Some(mut child) = child1_opt {
+            // External | Builtin
+            // Wait for external. 
+            // We should probably drop its stdout to avoid blocking if it writes a lot.
+            // But for now, just waiting.
+            let _ = child.wait();
+        }
+        
+        // Run builtin to real stdout
+        run_builtin(cmd2, &args2, &mut std::io::stdout(), &mut std::io::stderr());
+        
+    } else {
+        // Cmd2 is External
+        if let Some(exe2) = find_executable_in_path(cmd2) {
+            let mut command = Command::new(&exe2);
+            command.args(&args2);
+            
+            if let Some(input) = output1_opt {
+                // Builtin | External
+                command.stdin(Stdio::piped());
+                match command.spawn() {
+                    Ok(mut child) => {
+                        if let Some(mut stdin) = child.stdin.take() {
+                            let _ = stdin.write_all(&input);
+                        }
+                        let _ = child.wait();
+                    }
+                    Err(e) => eprintln!("Failed to execute {}: {}", cmd2, e),
+                }
+            } else if let Some(mut child1) = child1_opt {
+                // External | External
+                if let Some(stdout1) = child1.stdout.take() {
+                    command.stdin(stdout1);
+                    match command.spawn() {
+                        Ok(mut child2) => {
+                            let _ = child1.wait();
+                            let _ = child2.wait();
+                        }
+                        Err(e) => {
+                            eprintln!("Failed to execute {}: {}", cmd2, e);
+                            let _ = child1.kill();
+                        }
+                    }
+                }
+            }
+        } else {
             eprintln!("{}: command not found", cmd2);
-            return;
         }
-    };
-
-    // Spawn first command with piped stdout
-    let mut child1 = match Command::new(&exe1)
-        .args(&args1)
-        .stdout(Stdio::piped())
-        .spawn()
-    {
-        Ok(child) => child,
-        Err(e) => {
-            eprintln!("Failed to execute {}: {}", cmd1, e);
-            return;
-        }
-    };
-
-    // Take the stdout from the first command
-    let stdout1 = match child1.stdout.take() {
-        Some(stdout) => stdout,
-        None => {
-            eprintln!("Failed to capture stdout from {}", cmd1);
-            let _ = child1.kill();
-            return;
-        }
-    };
-
-    // Spawn second command with first command's stdout as stdin
-    let mut child2 = match Command::new(&exe2)
-        .args(&args2)
-        .stdin(stdout1)
-        .spawn()
-    {
-        Ok(child) => child,
-        Err(e) => {
-            eprintln!("Failed to execute {}: {}", cmd2, e);
-            let _ = child1.kill();
-            return;
-        }
-    };
-
-    // Wait for both processes to complete
-    let _ = child1.wait();
-    let _ = child2.wait();
+    }
 }
 
 fn main() {
@@ -277,7 +383,6 @@ fn main() {
         let input = rl.readline("$ ");
         match input {
             Ok(line) => {
-                const BUILTIN_CMDS: [&str; 5] = ["echo", "type", "exit", "pwd", "cd"];
                 let tokens = parse_input(&line);
 
                 if tokens.is_empty() {
@@ -339,158 +444,106 @@ fn main() {
                     continue;
                 }
 
+                // Prepare output writers based on redirection
+                let mut stdout: Box<dyn Write> = if let Some(path) = &redirect_path {
+                    match std::fs::File::create(path) {
+                        Ok(f) => Box::new(f),
+                        Err(e) => {
+                            eprintln!("Failed to create file: {}", e);
+                            continue;
+                        }
+                    }
+                } else if let Some(path) = &append_redirect_path {
+                    match std::fs::OpenOptions::new().create(true).append(true).open(path) {
+                        Ok(f) => Box::new(f),
+                        Err(e) => {
+                            eprintln!("Failed to open file: {}", e);
+                            continue;
+                        }
+                    }
+                } else {
+                    Box::new(io::stdout())
+                };
+
+                let mut stderr: Box<dyn Write> = if let Some(path) = &stderr_redirect_path {
+                    match std::fs::File::create(path) {
+                        Ok(f) => Box::new(f),
+                        Err(e) => {
+                            eprintln!("Failed to create file: {}", e);
+                            continue;
+                        }
+                    }
+                } else if let Some(path) = &stderr_append_path {
+                    match std::fs::OpenOptions::new().create(true).append(true).open(path) {
+                        Ok(f) => Box::new(f),
+                        Err(e) => {
+                            eprintln!("Failed to open file: {}", e);
+                            continue;
+                        }
+                    }
+                } else {
+                    Box::new(io::stderr())
+                };
+
                 let command = &tokens[0];
                 let args: Vec<&str> = tokens[1..].iter().map(|s| s.as_str()).collect();
-                match command.as_str() {
-                    "exit" => exit(0),
-                    "echo" => {
-                        let output_str = args.join(" ");
-                        if let Some(path) = redirect_path {
-                            // Echo traditionally appends a trailing newline
-                            let _ = std::fs::write(path, format!("{}\n", output_str));
-                        } else if let Some(path) = append_redirect_path {
-                            use std::io::Write as _;
-                            if let Ok(mut file) = std::fs::OpenOptions::new().create(true).append(true).open(path) {
-                                let _ = writeln!(file, "{}", output_str);
-                            }
-                        } else {
-                            println!("{}", output_str);
-                        }
-                        // If stderr is redirected, ensure target file exists even though echo emits no stderr
-                        if let Some(path) = stderr_redirect_path.clone() {
-                            let _ = std::fs::write(path, "");
-                        }
-                    }
-                    "type" => {
-                        let phrase = args.get(0).unwrap_or(&"");
-                        if BUILTIN_CMDS.contains(phrase) {
-                            println!("{} is a shell builtin", phrase);
-                        } else if let Some(exe) = find_executable_in_path(phrase) {
-                            println!("{} is {}", phrase, exe.display());
-                        } else {
-                            let path_var = env::var("PATH").unwrap_or_default();
-                            let paths = env::split_paths(&path_var);
-                            let mut found = false;
-                            for path in paths {
-                                let exe_path = path.join(phrase);
-                if let Some(path) = stderr_append_path.clone() {
-                    // ...existing code...
-                    let _ = std::fs::OpenOptions::new().create(true).append(true).open(path);
-                }
-                                if exe_path.exists() && exe_path.is_file() {
-                                    println!("{} is {}", phrase, exe_path.display());
-                                    found = true;
-                                    break;
-                                }
-                            }
-                            if !found {
-                                println!("{}: not found", phrase);
-                            }
-                        }
-                    }
-                    "pwd" => {
-                        let current_dir = env::current_dir().unwrap();
-                        println!("{}", current_dir.display());
-                    }
-                    "cd" => {
-                        let new_dir = args.get(0).unwrap_or(&"");
-                        if new_dir.is_empty() {
-                            let home_dir = env::var("HOME").unwrap_or_default();
-                            if let Err(_) = env::set_current_dir(&home_dir) {
-                                eprintln!("cd: {}: Unable to change directory", home_dir);
-                            }
-                        } else {
-                            let expanded = if new_dir.starts_with('~') {
-                                let home_dir = env::var("HOME").unwrap_or_default();
-                                new_dir.replacen('~', &home_dir, 1)
-                            } else {
-                                new_dir.to_string()
-                            };
-                            let path = Path::new(&expanded);
-                            if let Err(_) = env::set_current_dir(path) {
-                                eprintln!("cd: {}: No such file or directory", expanded);
-                            }
-                        }
-                    }
-                    "cat" => {
-                        let mut output = String::new();
-                        let mut err_output = String::new();
-                        for file_path in args {
-                            let clean_path = file_path.trim_end_matches(&['\n', '\r'][..]);
-                            match std::fs::read_to_string(clean_path) {
-                                Ok(content) => output.push_str(&content),
-                                Err(_) => {
-                                    let msg = format!("cat: {}: No such file or directory\n", clean_path);
-                                    if stderr_redirect_path.is_some() {
-                                        err_output.push_str(&msg);
-                                    } else if stderr_append_path.is_some() {
-                                        err_output.push_str(&msg);
-                                    } else {
-                                        eprint!("{}", msg);
-                                    }
-                                }
-                            }
-                        }
-                        if let Some(path) = redirect_path {
-                            let _ = std::fs::write(path, output);
-                        } else if let Some(path) = append_redirect_path {
-                            use std::io::Write as _;
-                            if let Ok(mut file) = std::fs::OpenOptions::new().create(true).append(true).open(path) {
-                                let _ = write!(file, "{}", output);
-                            }
-                        } else if !output.is_empty() {
-                            if output.ends_with('\n') {
-                                print!("{}", output);
-                            } else {
-                                println!("{}", output);
-                            }
-                        }
-                        if let Some(path) = stderr_redirect_path {
-                            let _ = std::fs::write(path, err_output);
-                        } else if let Some(path) = stderr_append_path {
-                            use std::io::Write as _;
-                            if let Ok(mut file) = std::fs::OpenOptions::new().create(true).append(true).open(path) {
-                                let _ = write!(file, "{}", err_output);
-                            }
-                        }
-                    }
-                    _ => {
-                        if let Some(exe_path) = find_executable_in_path(command) {
-                            let output = Command::new(&exe_path)
-                                .args(&args)
-                                .output()
-                                .expect("failed to execute process");
 
-                            let stdout_str = String::from_utf8_lossy(&output.stdout);
-                            let stderr_str = String::from_utf8_lossy(&output.stderr);
-
-                            let path_prefix = exe_path.parent().unwrap().to_str().unwrap();
-                            let modified_stdout = stdout_str.replace(&format!("{}/", path_prefix), "");
-                            let modified_stderr = stderr_str.replace(&format!("{}/", path_prefix), "");
-
-                            if let Some(path) = redirect_path {
-                                let _ = std::fs::write(path, modified_stdout);
-                            } else if let Some(path) = append_redirect_path {
-                                use std::io::Write as _;
-                                if let Ok(mut file) = std::fs::OpenOptions::new().create(true).append(true).open(path) {
-                                    let _ = write!(file, "{}", modified_stdout);
-                                }
-                            } else {
-                                io::stdout().write_all(modified_stdout.as_bytes()).unwrap();
+                // Try running as builtin
+                if !run_builtin(command, &args, &mut stdout, &mut stderr) {
+                    // Not a builtin, try external
+                    if let Some(exe_path) = find_executable_in_path(command) {
+                        // For external commands, we need to handle redirection differently
+                        // because Command::new uses Stdio, not Write trait objects.
+                        // But we already created Write objects.
+                        // We can't easily convert Write back to Stdio/File.
+                        // So we should probably check builtin FIRST, then do redirection setup for external differently?
+                        // OR, we can just use the paths again.
+                        
+                        // Re-evaluating logic:
+                        // The previous code handled redirection inside each match arm or passed it.
+                        // To keep it clean, let's revert the Write object creation for external commands
+                        // and handle them using the paths variables which are still available.
+                        
+                        let stdout_stdio = if let Some(path) = &redirect_path {
+                            match std::fs::File::create(path) {
+                                Ok(f) => std::process::Stdio::from(f),
+                                Err(_) => std::process::Stdio::null(),
                             }
-                            if let Some(path) = stderr_redirect_path {
-                                let _ = std::fs::write(path, modified_stderr);
-                            } else if let Some(path) = stderr_append_path {
-                                use std::io::Write as _;
-                                if let Ok(mut file) = std::fs::OpenOptions::new().create(true).append(true).open(path) {
-                                    let _ = write!(file, "{}", modified_stderr);
-                                }
-                            } else {
-                                io::stderr().write_all(modified_stderr.as_bytes()).unwrap();
+                        } else if let Some(path) = &append_redirect_path {
+                            match std::fs::OpenOptions::new().create(true).append(true).open(path) {
+                                Ok(f) => std::process::Stdio::from(f),
+                                Err(_) => std::process::Stdio::null(),
                             }
                         } else {
-                            println!("{}: command not found", command);
+                            std::process::Stdio::inherit()
+                        };
+
+                        let stderr_stdio = if let Some(path) = &stderr_redirect_path {
+                            match std::fs::File::create(path) {
+                                Ok(f) => std::process::Stdio::from(f),
+                                Err(_) => std::process::Stdio::null(),
+                            }
+                        } else if let Some(path) = &stderr_append_path {
+                            match std::fs::OpenOptions::new().create(true).append(true).open(path) {
+                                Ok(f) => std::process::Stdio::from(f),
+                                Err(_) => std::process::Stdio::null(),
+                            }
+                        } else {
+                            std::process::Stdio::inherit()
+                        };
+
+                        let mut child = Command::new(command)
+                            .args(&args)
+                            .stdout(stdout_stdio)
+                            .stderr(stderr_stdio)
+                            .spawn();
+                            
+                        match child {
+                            Ok(mut c) => { let _ = c.wait(); },
+                            Err(e) => eprintln!("Failed to execute process: {}", e),
                         }
+                    } else {
+                        println!("{}: command not found", command);
                     }
                 }
             }
