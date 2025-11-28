@@ -87,7 +87,9 @@ impl Completer for BuiltinCompleter {
                 return Ok((0, Vec::new()));
             } else if tab_count == 1 {
                 println!();
-                for (i, name) in external_matches.iter().enumerate() {
+                let mut sorted_matches = external_matches.clone();
+                sorted_matches.sort();
+                for (i, name) in sorted_matches.iter().enumerate() {
                     if i > 0 { print!("  "); }
                     print!("{}", name);
                 }
