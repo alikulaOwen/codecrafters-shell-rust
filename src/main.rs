@@ -1,27 +1,15 @@
 use pathsearch::find_executable_in_path;
 use rustyline::completion::{Completer, Pair};
-use rustyline::Context;
-use rustyline::Editor;
+use rustyline::{Editor, Helper, Context};
+use rustyline::hint::Hinter;
+use rustyline::highlight::Highlighter;
 use std::env;
 use std::io::{self, Write};
 use std::path::Path;
 use std::process::{exit, Command};
 
 struct BuiltinCompleter;
-use rustyline::Helper;
-use rustyline::hint::Hinter;
-use rustyline::highlight::Highlighter;
-use rustyline::validate::Validator;
 
-impl Helper for BuiltinCompleter {}
-impl Hinter for BuiltinCompleter {
-    type Hint = String;
-    fn hint(&self, _line: &str, _pos: usize, _ctx: &Context<'_>) -> Option<String> {
-        None
-    }
-}
-impl Highlighter for BuiltinCompleter {}
-impl Validator for BuiltinCompleter {}
 impl Completer for BuiltinCompleter {
     type Candidate = Pair;
     fn complete(
@@ -44,6 +32,16 @@ impl Completer for BuiltinCompleter {
         Ok((0, matches))
     }
 }
+
+impl Hinter for BuiltinCompleter {
+    fn hint(&self, _line: &str, _pos: usize, _ctx: &Context<'_>) -> Option<String> {
+        None
+    }
+}
+
+impl Highlighter for BuiltinCompleter {}
+
+impl Helper for BuiltinCompleter {}
 
 fn parse_input(input: &str) -> Vec<String> {
     let mut tokens = Vec::new();
@@ -108,8 +106,8 @@ fn parse_input(input: &str) -> Vec<String> {
 }
 
 fn main() {
-    let mut rl = Editor::<BuiltinCompleter, rustyline::history::DefaultHistory>::new().unwrap();
-    // Completer is provided via Helper in rustyline v12
+    let mut rl = Editor::new();
+    rl.set_helper(Some(BuiltinCompleter));
     loop {
         let input = rl.readline("$ ");
         match input {
