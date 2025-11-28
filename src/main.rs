@@ -21,6 +21,7 @@ impl Completer for BuiltinCompleter {
         let candidates = ["echo", "exit"];
         let fragment = &line[..pos];
         let mut matches = Vec::new();
+        // Builtins
         for &cmd in &candidates {
             if cmd.starts_with(fragment) {
                 matches.push(Pair {
@@ -28,6 +29,47 @@ impl Completer for BuiltinCompleter {
                     replacement: format!("{} ", cmd),
                 });
             }
+        }
+        // External executables in PATH
+        if let Ok(path_var) = std::env::var("PATH") {
+            for dir in path_var.split(':') {
+                let path = std::path::Path::new(dir);
+                if !path.exists() { continue; }
+                if let Ok(entries) = std::fs::read_dir(path) {
+                    for entry in entries.flatten() {
+                        let file_path = entry.path();
+                        if let Some(file_name) = file_path.file_name().and_then(|n| n.to_str()) {
+                            if file_name.starts_with(fragment) {
+                                // Only add if executable
+                                #[cfg(unix)]
+                                {
+                                    use std::os::unix::fs::PermissionsExt;
+                                    if let Ok(meta) = entry.metadata() {
+                                        if meta.permissions().mode() & 0o111 != 0 {
+                                            matches.push(Pair {
+                                                display: format!("{} ", file_name),
+                                                replacement: format!("{} ", file_name),
+                                            });
+                                        }
+                                    }
+                                }
+                                #[cfg(not(unix))]
+                                {
+                                    matches.push(Pair {
+                                        display: format!("{} ", file_name),
+                                        replacement: format!("{} ", file_name),
+                                    });
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        if matches.is_empty() {
+            // Ring bell if no completion
+            print!("\x07");
+            std::io::stdout().flush().ok();
         }
         Ok((0, matches))
     }
