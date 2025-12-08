@@ -450,6 +450,9 @@ fn main() {
     // Load history from file on startup (ignore errors if file doesn't exist)
     let _ = rl.load_history(&history_file);
     
+    // Track the last history index that was appended to each file
+    let mut last_appended_index: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
+    
     loop {
         let input = rl.readline("$ ");
         match input {
@@ -483,27 +486,36 @@ fn main() {
 
                 // Special handling for history -a <path>
                 if tokens.len() == 3 && tokens[0] == "history" && tokens[1] == "-a" {
-                    let history_file_path = &tokens[2];
+                    let history_file_path = tokens[2].clone();
                     
                     // Get current history
                     let current_history: Vec<String> = rl.history().iter().map(|s| s.to_string()).collect();
                     
-                    // Append all current history entries to file
-                    match std::fs::OpenOptions::new()
-                        .create(true)
-                        .append(true)
-                        .open(history_file_path)
-                    {
-                        Ok(mut file) => {
-                            use std::io::Write;
-                            for entry in current_history {
-                                if let Err(e) = writeln!(file, "{}", entry) {
-                                    eprintln!("history: {}: {}", history_file_path, e);
-                                    break;
+                    // Get the starting index (where we left off last time)
+                    let start_index = *last_appended_index.get(&history_file_path).unwrap_or(&0);
+                    
+                    // Only append new entries since last append
+                    let new_entries: Vec<String> = current_history.iter().skip(start_index).cloned().collect();
+                    
+                    if !new_entries.is_empty() {
+                        match std::fs::OpenOptions::new()
+                            .create(true)
+                            .append(true)
+                            .open(&history_file_path)
+                        {
+                            Ok(mut file) => {
+                                use std::io::Write;
+                                for entry in &new_entries {
+                                    if let Err(e) = writeln!(file, "{}", entry) {
+                                        eprintln!("history: {}: {}", history_file_path, e);
+                                        break;
+                                    }
                                 }
+                                // Update the last appended index for this file
+                                last_appended_index.insert(history_file_path, current_history.len());
                             }
+                            Err(e) => eprintln!("history: {}: {}", history_file_path, e),
                         }
-                        Err(e) => eprintln!("history: {}: {}", history_file_path, e),
                     }
                     continue;
                 }
