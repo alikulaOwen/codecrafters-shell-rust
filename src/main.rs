@@ -468,6 +468,13 @@ fn main() {
                     continue;
                 }
 
+                // Special handling for exit command - save history before exiting
+                if tokens.len() == 1 && tokens[0] == "exit" {
+                    let _ = rl.save_history(&history_file);
+                    exit(0);
+                }
+
+
                 // Special handling for history -r <path>
                 if tokens.len() == 3 && tokens[0] == "history" && tokens[1] == "-r" {
                     let history_file = &tokens[2];
