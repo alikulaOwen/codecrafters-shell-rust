@@ -435,12 +435,21 @@ fn execute_pipeline(commands: &[Vec<String>]) {
 }
 
 fn main() {
+    // Define default history file path
+    let history_file = env::var("HOME")
+        .map(|home| format!("{}/.shell_history", home))
+        .unwrap_or_else(|_| ".shell_history".to_string());
+    
     let config = Config::builder()
         .completion_type(CompletionType::List)
         .max_history_size(1000)
         .build();
     let mut rl = Editor::with_config(config);
     rl.set_helper(Some(BuiltinCompleter));
+    
+    // Load history from file on startup (ignore errors if file doesn't exist)
+    let _ = rl.load_history(&history_file);
+    
     loop {
         let input = rl.readline("$ ");
         match input {
@@ -463,7 +472,23 @@ fn main() {
                     continue;
                 }
 
+                // Special handling for history -w <path>
+                if tokens.len() == 3 && tokens[0] == "history" && tokens[1] == "-w" {
+                    let history_file = &tokens[2];
+                    if let Err(e) = rl.save_history(history_file) {
+                        eprintln!("history: {}: {}", history_file, e);
+                    }
+                    continue;
+                }
 
+                // Special handling for history -a <path>
+                if tokens.len() == 3 && tokens[0] == "history" && tokens[1] == "-a" {
+                    let history_file = &tokens[2];
+                    if let Err(e) = rl.append_history(history_file) {
+                        eprintln!("history: {}: {}", history_file, e);
+                    }
+                    continue;
+                }
 
                 // Check for pipeline operator
                 if tokens.contains(&"|".to_string()) {
@@ -648,4 +673,7 @@ fn main() {
             Err(_) => break,
         }
     }
+    
+    // Save history on exit
+    let _ = rl.save_history(&history_file);
 }
