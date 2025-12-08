@@ -199,8 +199,9 @@ fn run_builtin(
     args: &[&str],
     stdout: &mut dyn std::io::Write,
     stderr: &mut dyn std::io::Write,
+    history: Option<&[String]>,
 ) -> bool {
-    const BUILTIN_CMDS: [&str; 5] = ["echo", "type", "exit", "pwd", "cd"];
+    const BUILTIN_CMDS: [&str; 6] = ["echo", "type", "exit", "pwd", "cd", "history"];
 
     match command {
         "exit" => exit(0),
@@ -263,6 +264,14 @@ fn run_builtin(
             }
             true
         }
+        "history" => {
+            if let Some(hist) = history {
+                for (i, cmd) in hist.iter().enumerate() {
+                    let _ = writeln!(stdout, "  {}  {}", i + 1, cmd);
+                }
+            }
+            true
+        }
         _ => false,
     }
 }
@@ -292,7 +301,7 @@ fn execute_pipeline(commands: &[Vec<String>]) {
         let is_last = i == commands.len() - 1;
         
         // Check if this is a builtin command
-        let is_builtin = run_builtin(cmd, &args, &mut Vec::new(), &mut Vec::new());
+        let is_builtin = run_builtin(cmd, &args, &mut Vec::new(), &mut Vec::new(), None);
         
         if is_builtin {
             // Handle builtin command
@@ -306,10 +315,10 @@ fn execute_pipeline(commands: &[Vec<String>]) {
             // Run the builtin
             if is_last {
                 // Last command: output to real stdout
-                run_builtin(cmd, &args, &mut std::io::stdout(), &mut std::io::stderr());
+                run_builtin(cmd, &args, &mut std::io::stdout(), &mut std::io::stderr(), None);
             } else {
                 // Not the last command: capture output for next command
-                run_builtin(cmd, &args, &mut capture, &mut std::io::stderr());
+                run_builtin(cmd, &args, &mut capture, &mut std::io::stderr(), None);
                 previous_output = Some(capture);
             }
             previous_child = None;
@@ -416,6 +425,9 @@ fn main() {
         let input = rl.readline("$ ");
         match input {
             Ok(line) => {
+                // Add to history
+                let _ = rl.add_history_entry(&line);
+                
                 let tokens = parse_input(&line);
 
                 if tokens.is_empty() {
@@ -540,8 +552,11 @@ fn main() {
                 let command = &tokens[0];
                 let args: Vec<&str> = tokens[1..].iter().map(|s| s.as_str()).collect();
 
+                // Get history for builtin commands
+                let history_vec: Vec<String> = rl.history().iter().map(|s| s.to_string()).collect();
+                
                 // Try running as builtin
-                if !run_builtin(command, &args, &mut stdout, &mut stderr) {
+                if !run_builtin(command, &args, &mut stdout, &mut stderr, Some(&history_vec)) {
                     // Not a builtin, try external
                     if let Some(_exe_path) = find_executable_in_path(command) {
                         // For external commands, we need to handle redirection differently
