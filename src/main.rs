@@ -435,10 +435,12 @@ fn execute_pipeline(commands: &[Vec<String>]) {
 }
 
 fn main() {
-    // Define default history file path
-    let history_file = env::var("HOME")
-        .map(|home| format!("{}/.shell_history", home))
-        .unwrap_or_else(|_| ".shell_history".to_string());
+    // Define history file path - check HISTFILE env var first, then fall back to default
+    let history_file = env::var("HISTFILE").unwrap_or_else(|_| {
+        env::var("HOME")
+            .map(|home| format!("{}/.shell_history", home))
+            .unwrap_or_else(|_| ".shell_history".to_string())
+    });
     
     let config = Config::builder()
         .completion_type(CompletionType::List)
