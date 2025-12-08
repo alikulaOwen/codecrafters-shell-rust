@@ -24,7 +24,7 @@ use rustyline::hint::Hinter;
 use rustyline::highlight::Highlighter;
 use std::env;
 use std::io::{self, Write};
-use std::path::Path;
+
 use std::process::{exit, Command};
 
 struct BuiltinCompleter;
@@ -355,7 +355,7 @@ fn execute_pipeline(commands: &[Vec<String>]) {
                     }
                     
                     match command.spawn() {
-                        Ok(child2) => {
+                        Ok(mut child2) => {
                             let _ = child.wait();
                             if is_last {
                                 let _ = child2.wait();
@@ -376,7 +376,7 @@ fn execute_pipeline(commands: &[Vec<String>]) {
                     }
                     
                     match command.spawn() {
-                        Ok(child) => {
+                        Ok(mut child) => {
                             if is_last {
                                 let _ = child.wait();
                             } else {
@@ -543,7 +543,7 @@ fn main() {
                 // Try running as builtin
                 if !run_builtin(command, &args, &mut stdout, &mut stderr) {
                     // Not a builtin, try external
-                    if let Some(exe_path) = find_executable_in_path(command) {
+                    if let Some(_exe_path) = find_executable_in_path(command) {
                         // For external commands, we need to handle redirection differently
                         // because Command::new uses Stdio, not Write trait objects.
                         // But we already created Write objects.
@@ -584,7 +584,7 @@ fn main() {
                             std::process::Stdio::inherit()
                         };
 
-                        let mut child = Command::new(command)
+                        let child = Command::new(command)
                             .args(&args)
                             .stdout(stdout_stdio)
                             .stderr(stderr_stdio)
