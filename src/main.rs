@@ -266,7 +266,7 @@ fn run_builtin(
         }
         "history" => {
             if let Some(hist) = history {
-                // Check if we have a limit argument
+                
                 let limit = if let Some(n_str) = args.get(0) {
                     n_str.parse::<usize>().ok()
                 } else {
@@ -437,6 +437,7 @@ fn execute_pipeline(commands: &[Vec<String>]) {
 fn main() {
     let config = Config::builder()
         .completion_type(CompletionType::List)
+        .max_history_size(1000)
         .build();
     let mut rl = Editor::with_config(config);
     rl.set_helper(Some(BuiltinCompleter));
@@ -452,6 +453,17 @@ fn main() {
                 if tokens.is_empty() {
                     continue;
                 }
+
+                // Special handling for history -r <path>
+                if tokens.len() == 3 && tokens[0] == "history" && tokens[1] == "-r" {
+                    let history_file = &tokens[2];
+                    if let Err(e) = rl.load_history(history_file) {
+                        eprintln!("history: {}: {}", history_file, e);
+                    }
+                    continue;
+                }
+
+
 
                 // Check for pipeline operator
                 if tokens.contains(&"|".to_string()) {
