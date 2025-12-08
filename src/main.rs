@@ -267,109 +267,142 @@ fn run_builtin(
     }
 }
 
-fn execute_pipeline(cmd1_tokens: &[String], cmd2_tokens: &[String]) {
+fn execute_pipeline(commands: &[Vec<String>]) {
     use std::process::Stdio;
     
-    if cmd1_tokens.is_empty() || cmd2_tokens.is_empty() {
-        eprintln!("Invalid pipeline: empty command");
+    if commands.is_empty() {
+        eprintln!("Invalid pipeline: no commands");
         return;
     }
-
-    let cmd1 = &cmd1_tokens[0];
-    let args1: Vec<&str> = cmd1_tokens[1..].iter().map(|s| s.as_str()).collect();
     
-    let cmd2 = &cmd2_tokens[0];
-    let args2: Vec<&str> = cmd2_tokens[1..].iter().map(|s| s.as_str()).collect();
-
-    // Handle first command (Builtin or External)
-    let output1_opt: Option<Vec<u8>> = if run_builtin(cmd1, &args1, &mut Vec::new(), &mut Vec::new()) {
-        // It's a builtin. Capture output.
-        let mut capture = Vec::new();
-        run_builtin(cmd1, &args1, &mut capture, &mut std::io::stderr());
-        Some(capture)
-    } else {
-        None
-    };
-
-    let child1_opt = if output1_opt.is_none() {
-        // External command
-        if let Some(exe1) = find_executable_in_path(cmd1) {
-            match Command::new(&exe1)
-                .args(&args1)
-                .stdout(Stdio::piped())
-                .spawn()
-            {
-                Ok(child) => Some(child),
-                Err(e) => {
-                    eprintln!("Failed to execute {}: {}", cmd1, e);
-                    return;
-                }
-            }
-        } else {
-            eprintln!("{}: command not found", cmd1);
+    for cmd_tokens in commands {
+        if cmd_tokens.is_empty() {
+            eprintln!("Invalid pipeline: empty command");
             return;
         }
-    } else {
-        None
-    };
-
-    // Handle second command (Builtin or External)
-    // It needs input from cmd1
+    }
     
-    // If cmd2 is builtin
-    if run_builtin(cmd2, &args2, &mut Vec::new(), &mut Vec::new()) {
-        // Builtins in this shell don't really read stdin (except maybe cat if we implemented it, but we didn't implement stdin for cat)
-        // So we just run it.
-        // But we must consume/wait for cmd1.
+    // We'll chain commands together, maintaining the previous command's output
+    let mut previous_output: Option<Vec<u8>> = None;
+    let mut previous_child: Option<std::process::Child> = None;
+    
+    for (i, cmd_tokens) in commands.iter().enumerate() {
+        let cmd = &cmd_tokens[0];
+        let args: Vec<&str> = cmd_tokens[1..].iter().map(|s| s.as_str()).collect();
+        let is_last = i == commands.len() - 1;
         
-        if let Some(mut child) = child1_opt {
-            // External | Builtin
-            // Wait for external. 
-            // We should probably drop its stdout to avoid blocking if it writes a lot.
-            // But for now, just waiting.
-            let _ = child.wait();
-        }
+        // Check if this is a builtin command
+        let is_builtin = run_builtin(cmd, &args, &mut Vec::new(), &mut Vec::new());
         
-        // Run builtin to real stdout
-        run_builtin(cmd2, &args2, &mut std::io::stdout(), &mut std::io::stderr());
-        
-    } else {
-        // Cmd2 is External
-        if let Some(exe2) = find_executable_in_path(cmd2) {
-            let mut command = Command::new(&exe2);
-            command.args(&args2);
+        if is_builtin {
+            // Handle builtin command
+            let mut capture = Vec::new();
             
-            if let Some(input) = output1_opt {
-                // Builtin | External
-                command.stdin(Stdio::piped());
-                match command.spawn() {
-                    Ok(mut child) => {
-                        if let Some(mut stdin) = child.stdin.take() {
-                            let _ = stdin.write_all(&input);
-                        }
-                        let _ = child.wait();
+            // Wait for previous external command if any
+            if let Some(mut child) = previous_child.take() {
+                let _ = child.wait();
+            }
+            
+            // Run the builtin
+            if is_last {
+                // Last command: output to real stdout
+                run_builtin(cmd, &args, &mut std::io::stdout(), &mut std::io::stderr());
+            } else {
+                // Not the last command: capture output for next command
+                run_builtin(cmd, &args, &mut capture, &mut std::io::stderr());
+                previous_output = Some(capture);
+            }
+            previous_child = None;
+            
+        } else {
+            // Handle external command
+            if let Some(exe) = find_executable_in_path(cmd) {
+                let mut command = Command::new(&exe);
+                command.args(&args);
+                
+                // Set up stdin
+                if let Some(output) = previous_output.take() {
+                    // Previous command was a builtin with captured output
+                    command.stdin(Stdio::piped());
+                    if !is_last {
+                        command.stdout(Stdio::piped());
                     }
-                    Err(e) => eprintln!("Failed to execute {}: {}", cmd2, e),
-                }
-            } else if let Some(mut child1) = child1_opt {
-                // External | External
-                if let Some(stdout1) = child1.stdout.take() {
-                    command.stdin(stdout1);
+                    
                     match command.spawn() {
-                        Ok(mut child2) => {
-                            let _ = child1.wait();
-                            let _ = child2.wait();
+                        Ok(mut child) => {
+                            if let Some(mut stdin) = child.stdin.take() {
+                                let _ = stdin.write_all(&output);
+                            }
+                            
+                            if is_last {
+                                let _ = child.wait();
+                            } else {
+                                previous_child = Some(child);
+                            }
                         }
                         Err(e) => {
-                            eprintln!("Failed to execute {}: {}", cmd2, e);
-                            let _ = child1.kill();
+                            eprintln!("Failed to execute {}: {}", cmd, e);
+                            return;
+                        }
+                    }
+                } else if let Some(mut child) = previous_child.take() {
+                    // Previous command was an external command
+                    if let Some(stdout) = child.stdout.take() {
+                        command.stdin(stdout);
+                    }
+                    if !is_last {
+                        command.stdout(Stdio::piped());
+                    }
+                    
+                    match command.spawn() {
+                        Ok(child2) => {
+                            let _ = child.wait();
+                            if is_last {
+                                let _ = child2.wait();
+                            } else {
+                                previous_child = Some(child2);
+                            }
+                        }
+                        Err(e) => {
+                            eprintln!("Failed to execute {}: {}", cmd, e);
+                            let _ = child.kill();
+                            return;
+                        }
+                    }
+                } else {
+                    // First command in the pipeline
+                    if !is_last {
+                        command.stdout(Stdio::piped());
+                    }
+                    
+                    match command.spawn() {
+                        Ok(child) => {
+                            if is_last {
+                                let _ = child.wait();
+                            } else {
+                                previous_child = Some(child);
+                            }
+                        }
+                        Err(e) => {
+                            eprintln!("Failed to execute {}: {}", cmd, e);
+                            return;
                         }
                     }
                 }
+            } else {
+                eprintln!("{}: command not found", cmd);
+                // Clean up any running child process
+                if let Some(mut child) = previous_child.take() {
+                    let _ = child.kill();
+                }
+                return;
             }
-        } else {
-            eprintln!("{}: command not found", cmd2);
         }
+    }
+    
+    // Wait for any remaining child process
+    if let Some(mut child) = previous_child {
+        let _ = child.wait();
     }
 }
 
@@ -390,14 +423,33 @@ fn main() {
                 }
 
                 // Check for pipeline operator
-                if let Some(pipe_pos) = tokens.iter().position(|t| t == "|") {
-                    if pipe_pos == 0 || pipe_pos == tokens.len() - 1 {
+                if tokens.contains(&"|".to_string()) {
+                    // Split tokens by pipe operator to get all commands in the pipeline
+                    let mut pipeline_commands: Vec<Vec<String>> = Vec::new();
+                    let mut current_cmd: Vec<String> = Vec::new();
+                    
+                    for token in &tokens {
+                        if token == "|" {
+                            if current_cmd.is_empty() {
+                                eprintln!("Invalid pipeline syntax");
+                                continue;
+                            }
+                            pipeline_commands.push(current_cmd.clone());
+                            current_cmd.clear();
+                        } else {
+                            current_cmd.push(token.clone());
+                        }
+                    }
+                    
+                    // Add the last command
+                    if current_cmd.is_empty() {
                         eprintln!("Invalid pipeline syntax");
                         continue;
                     }
-                    let cmd1_tokens: Vec<String> = tokens[..pipe_pos].to_vec();
-                    let cmd2_tokens: Vec<String> = tokens[pipe_pos + 1..].to_vec();
-                    execute_pipeline(&cmd1_tokens, &cmd2_tokens);
+                    pipeline_commands.push(current_cmd);
+                    
+                    // Execute the pipeline
+                    execute_pipeline(&pipeline_commands);
                     continue;
                 }
 
