@@ -266,7 +266,26 @@ fn run_builtin(
         }
         "history" => {
             if let Some(hist) = history {
-                for (i, cmd) in hist.iter().enumerate() {
+                // Check if we have a limit argument
+                let limit = if let Some(n_str) = args.get(0) {
+                    n_str.parse::<usize>().ok()
+                } else {
+                    None
+                };
+                
+                // Determine which entries to show
+                let start_index = if let Some(n) = limit {
+                    if n < hist.len() {
+                        hist.len() - n
+                    } else {
+                        0
+                    }
+                } else {
+                    0
+                };
+                
+                // Display history entries
+                for (i, cmd) in hist.iter().enumerate().skip(start_index) {
                     let _ = writeln!(stdout, "  {}  {}", i + 1, cmd);
                 }
             }
