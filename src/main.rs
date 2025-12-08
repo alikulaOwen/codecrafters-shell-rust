@@ -483,9 +483,42 @@ fn main() {
 
                 // Special handling for history -a <path>
                 if tokens.len() == 3 && tokens[0] == "history" && tokens[1] == "-a" {
-                    let history_file = &tokens[2];
-                    if let Err(e) = rl.append_history(history_file) {
-                        eprintln!("history: {}: {}", history_file, e);
+                    let history_file_path = &tokens[2];
+                    
+                    // Read existing file content if it exists
+                    let mut existing_lines = Vec::new();
+                    if let Ok(content) = std::fs::read_to_string(history_file_path) {
+                        existing_lines = content.lines().map(|s| s.to_string()).collect();
+                    }
+                    
+                    // Get current history
+                    let current_history: Vec<String> = rl.history().iter().map(|s| s.to_string()).collect();
+                    
+                    // Find new entries (entries not in the existing file)
+                    let new_entries: Vec<String> = current_history
+                        .iter()
+                        .skip(existing_lines.len())
+                        .cloned()
+                        .collect();
+                    
+                    // Append new entries to file
+                    if !new_entries.is_empty() {
+                        match std::fs::OpenOptions::new()
+                            .create(true)
+                            .append(true)
+                            .open(history_file_path)
+                        {
+                            Ok(mut file) => {
+                                use std::io::Write;
+                                for entry in new_entries {
+                                    if let Err(e) = writeln!(file, "{}", entry) {
+                                        eprintln!("history: {}: {}", history_file_path, e);
+                                        break;
+                                    }
+                                }
+                            }
+                            Err(e) => eprintln!("history: {}: {}", history_file_path, e),
+                        }
                     }
                     continue;
                 }
