@@ -67,27 +67,7 @@ pub fn run_builtin(
             }
             true
         }
-        "cat" => {
-            let mut output = String::new();
-            let mut err_output = String::new();
-            for file_path in args {
-                let clean_path = file_path.trim_end_matches(&['\n', '\r'][..]);
-                match std::fs::read_to_string(clean_path) {
-                    Ok(content) => output.push_str(&content),
-                    Err(_) => {
-                        let msg = format!("cat: {}: No such file or directory\n", clean_path);
-                        err_output.push_str(&msg);
-                    }
-                }
-            }
-            if !output.is_empty() {
-                let _ = write!(stdout, "{}", output);
-            }
-            if !err_output.is_empty() {
-                let _ = write!(stderr, "{}", err_output);
-            }
-            true
-        }
+
         "history" => {
             if let Some(hist) = history {
                 let limit = if let Some(n_str) = args.get(0) {
