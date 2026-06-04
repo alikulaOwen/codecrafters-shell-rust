@@ -1,3 +1,10 @@
+/* 
+    * This file is part of the Rust-Shell project ()
+    * parser.rs - A simple parser for command-line input
+    * functions to parse command-line input into tokens, handling quotes and escapes
+    * handles single quotes, double quotes, and backslashes for escaping characters
+**/
+
 pub fn parse_input(input: &str) -> Vec<String> {
     let mut tokens = Vec::new();
     let mut current_token = String::new();

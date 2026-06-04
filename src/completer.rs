@@ -1,3 +1,26 @@
+/*
+ * Thought Process:
+ * - This module manages shell autocompletion. To make completion responsive, we implement:
+ *   1. A prefix-tree (Trie) for O(L) time complexity prefix lookup of commands and builtins,
+ *      avoiding sluggish O(N * L) linear searches over thousands of PATH entries.
+ *   2. An in-memory cache ('PathCache') tracking the 'PATH' environment variable and refreshing
+ *      every 30 seconds (or if PATH changes) to prevent high-frequency disk reads.
+ *   3. Context boundary parsing ('get_completion_context') to inspect cursor position and distinguish
+ *      command completion vs. file/directory path completion.
+ *   4. File path traversal ('complete_path') identifying local directories, applying slash appends,
+ *      filtering out files for 'cd' (directory-only checks), and sorting hidden files last.
+ *
+ * External Packages / Crates Alternative:
+ * - 'trie-rs' or 'sequence_trie' could replace our custom Trie structure.
+ * - 'rustyline' built-in helper/completion types (like 'FilenameCompleter') could be used for paths.
+ * - 'glob' or 'walkdir' could be used for scanning directory trees.
+ *
+ * Why External Packages are Easier:
+ * - These crates are thoroughly tested for cross-platform bugs (e.g., handling edge cases on Windows vs Unix).
+ *   They are highly optimized (simd-accelerated searches, lock-free structures) and maintained by the community,
+ *   saving development effort and reducing the codebase size.
+ */
+
 use std::collections::HashMap;
 use std::time::{Instant, Duration};
 use rustyline::completion::{Completer, Pair};
@@ -203,6 +226,25 @@ fn get_completion_context(line: &str, pos: usize) -> (usize, Vec<String>, String
     (word_start, words, current_word, is_command_position)
 }
 
+fn escape_path(path: &str) -> String {
+    let parts: Vec<String> = path.split('/').map(|part| {
+        let mut escaped = String::new();
+        for c in part.chars() {
+            match c {
+                ' ' | '\\' | '\'' | '"' | '|' | '&' | ';' | '<' | '>' | '(' | ')' | '$' | '!' | '*' | '?' => {
+                    escaped.push('\\');
+                    escaped.push(c);
+                }
+                _ => {
+                    escaped.push(c);
+                }
+            }
+        }
+        escaped
+    }).collect();
+    parts.join("/")
+}
+
 fn complete_path(fragment: &str, only_dirs: bool) -> Vec<Pair> {
     let last_slash = fragment.rfind('/');
     let (dir_part, prefix_part) = match last_slash {
@@ -233,9 +275,9 @@ fn complete_path(fragment: &str, only_dirs: bool) -> Vec<Pair> {
                 }
                 
                 let replacement = if is_dir {
-                    format!("{}{}/", dir_part, name_str)
+                    format!("{}{}/", escape_path(dir_part), escape_path(&name_str))
                 } else {
-                    format!("{}{}", dir_part, name_str)
+                    format!("{}{}", escape_path(dir_part), escape_path(&name_str))
                 };
                 
                 let display = if is_dir {

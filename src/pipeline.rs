@@ -1,3 +1,21 @@
+/*
+ * Thought Process:
+ * - This module handles pipeline chaining (e.g., 'cmd1 | cmd2 | cmd3').
+ * - We iterate through command tokens, spawning child processes sequentially. We redirect the stdout of the
+ *   previous command to a pipe, capture the output if the previous command was a shell builtin (running
+ *   in-process), and write it to the stdin of the next child process using standard UNIX/OS pipe patterns.
+ *
+ * External Packages / Crates Alternative:
+ * - 'duct' or 'subprocess' can be used to construct, pipe, and run processes easily.
+ * - 'os_pipe' can be used for cross-platform piping of standard streams.
+ *
+ * Why External Packages are Easier:
+ * - Managing OS pipes, deadlocks (caused by not closing pipe ends in the parent process), background children,
+ *   and redirecting stderr/stdout correctly across Unix and Windows is extremely tricky. Libraries like 'duct'
+ *   handle all process lifetime management, pipe redirection, and exit status aggregation with a simple,
+ *   leak-safe builder API.
+ */
+
 use std::process::{Command, Stdio};
 use std::io::Write;
 use pathsearch::find_executable_in_path;

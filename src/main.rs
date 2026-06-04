@@ -10,6 +10,20 @@ use std::env;
 use std::io::{self, Write};
 use std::process::{exit, Command};
 
+/* 
+ *  This file is part of the Rust-Shell project ()
+ *  main.rs - The main entry point for the Rust-Shell application
+ *  sets up the command-line interface, handles user input, and manages command execution
+ *  uses rustyline for input handling and history management
+ *  supports built-in commands, external commands, pipelines, and I/O redirection
+ *  handles history file management with support for HISTFILE environment variable and default location
+ *  implements special handling for the "history" command to allow loading and saving history from arbitrary files
+ *  tracks the last history index appended to each file for efficient "history -a" implementation
+ *  supports output redirection for both stdout and stderr with ">" and "2>" operators, as well as append modes with ">>" and "2>>"
+ * handles pipelines by splitting input on "|" and executing each command in sequence, connecting stdout of one to stdin of the next
+ * 
+ */
+
 fn main() {
     // Define history file path - check HISTFILE env var first, then fall back to default
     let history_file = env::var("HISTFILE").unwrap_or_else(|_| {

@@ -1,3 +1,18 @@
+/*
+ * Thought Process:
+ * - This module handles internal shell commands (builtins) like 'echo', 'cd', 'exit', 'pwd', 'type',
+ *   'cat', and 'history'. Because they run in the shell's process context (especially 'cd' and 'exit'),
+ *   they cannot be external processes and must be executed directly by mutating shell state (e.g. 'env::set_current_dir').
+ *
+ * External Packages / Crates Alternative:
+ * - 'clap' (Command Line Argument Parser) or 'lexopt' can parse arguments, flags, and options for builtins.
+ *
+ * Why External Packages are Easier:
+ * - Writing custom argument parsers (like handling history flags '-a', '-w', '-r' manually) is error-prone.
+ *   Crates like 'clap' automatically validate types, support nested subcommands, format '--help' text perfectly,
+ *   and enforce standard CLI conventions out of the box.
+ */
+
 use std::env;
 use std::process::exit;
 use std::io::Write;
