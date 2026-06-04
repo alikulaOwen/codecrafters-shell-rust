@@ -15,6 +15,14 @@ pub struct JobManager {
     pub jobs: Vec<Job>,
 }
 
+fn clean_command(command: &str) -> String {
+    let mut s = command.trim().to_string();
+    if s.ends_with('&') {
+        s.pop();
+    }
+    s.trim().to_string()
+}
+
 impl JobManager {
     pub fn new() -> Self {
         JobManager { jobs: Vec::new() }
@@ -63,7 +71,8 @@ impl JobManager {
                 } else {
                     " "
                 };
-                println!("[{}]{}  Done                    {}", job.id, symbol, job.command);
+                let cmd_str = clean_command(&job.command);
+                println!("[{}]{}  {:<24}{}", job.id, symbol, "Done", cmd_str);
                 to_remove.push(job.id);
             }
         }
@@ -98,7 +107,12 @@ impl JobManager {
                 JobStatus::Done => "Done",
             };
 
-            println!("[{}]{}  {}                    {}", job.id, symbol, status_str, job.command);
+            let cmd_str = match job.status {
+                JobStatus::Running => format!("{} &", clean_command(&job.command)),
+                JobStatus::Done => clean_command(&job.command),
+            };
+
+            println!("[{}]{}  {:<24}{}", job.id, symbol, status_str, cmd_str);
             if job.status == JobStatus::Done {
                 to_remove.push(job.id);
             }
