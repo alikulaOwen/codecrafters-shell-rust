@@ -89,7 +89,7 @@ pub fn run_builtin(
                 
                 // Display history entries
                 for (i, cmd) in hist.iter().enumerate().skip(start_index) {
-                    let _ = writeln!(stdout, "  {}  {}", i + 1, cmd);
+                    let _ = writeln!(stdout, "{:>5}  {}", i + 1, cmd);
                 }
             }
             true

@@ -36,6 +36,7 @@ fn main() {
     let config = Config::builder()
         .completion_type(CompletionType::List)
         .max_history_size(1000)
+        .history_ignore_dups(false)
         .build();
     let mut rl = Editor::with_config(config);
     rl.set_helper(Some(completer::BuiltinCompleter::new()));
