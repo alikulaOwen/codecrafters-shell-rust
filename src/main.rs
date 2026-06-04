@@ -2,6 +2,7 @@ mod completer;
 mod parser;
 mod builtin;
 mod pipeline;
+mod jobs;
 
 use pathsearch::find_executable_in_path;
 use rustyline::config::{Config, CompletionType};
@@ -45,7 +46,10 @@ fn main() {
     // Track the last history index that was appended to each file
     let mut last_appended_index: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
     
+    let mut job_manager = jobs::JobManager::new();
+    
     loop {
+        job_manager.reap_and_notify();
         let input = rl.readline("$ ");
         match input {
             Ok(line) => {
@@ -62,6 +66,11 @@ fn main() {
                 if tokens.len() == 1 && tokens[0] == "exit" {
                     let _ = rl.save_history(&history_file);
                     exit(0);
+                }
+
+                if tokens.len() == 1 && tokens[0] == "jobs" {
+                    job_manager.list_jobs();
+                    continue;
                 }
 
                 // Special handling for history -r <path>
@@ -149,6 +158,17 @@ fn main() {
                 }
 
                 let mut tokens = tokens; // Make mutable for redirection handling
+
+                let mut is_background = false;
+                if let Some(last) = tokens.last_mut() {
+                    if last == "&" {
+                        is_background = true;
+                        tokens.pop();
+                    } else if last.ends_with('&') {
+                        is_background = true;
+                        last.pop();
+                    }
+                }
 
                 // Handle output redirection tokens: ">" and "1>"
                 let mut redirect_path: Option<String> = None;
@@ -277,7 +297,15 @@ fn main() {
                             .spawn();
                             
                         match child {
-                            Ok(mut c) => { let _ = c.wait(); },
+                            Ok(mut c) => {
+                                if is_background {
+                                    let pid = c.id();
+                                    let id = job_manager.add_job(c, line.trim().to_string());
+                                    println!("[{}] {}", id, pid);
+                                } else {
+                                    let _ = c.wait();
+                                }
+                            }
                             Err(e) => eprintln!("Failed to execute process: {}", e),
                         }
                     } else {
