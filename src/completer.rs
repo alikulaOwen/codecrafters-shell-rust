@@ -47,16 +47,34 @@ fn longest_common_prefix(strings: &[String]) -> String {
     prefix
 }
 
+/*
+ * TrieNode Struct
+ * - Represents a single character node in the Prefix Tree (Trie).
+ * - Terminal feature: Serves as the structural block for command name indexing.
+ *   Building character-by-character tree paths allows fast prefix matching of command names.
+ */
 #[derive(Default)]
 struct TrieNode {
     children: HashMap<char, TrieNode>,
     is_word: bool,
 }
 
+/*
+ * Trie Struct
+ * - Represents the prefix tree containing all complete commands (builtins + PATH executables).
+ * - Terminal feature: Implements high-performance prefix autocompletion. When a user presses <TAB>,
+ *   this tree retrieves all commands matching the prefix in O(L) time. This prevents
+ *   command-line lag by avoiding O(N) scans of large lists.
+ */
 struct Trie {
     root: TrieNode,
 }
 
+/*
+ * Trie Implementation Block
+ * - Contains constructors, word insertion, and prefix search logic.
+ * - Terminal feature: Generates matching command autocompletion candidates from prefix fragments.
+ */
 impl Trie {
     fn new() -> Self {
         Trie {
@@ -99,12 +117,24 @@ impl Trie {
     }
 }
 
+/*
+ * PathCache Struct
+ * - Stores a Trie indexing executables in the environment PATH, along with cache metadata.
+ * - Terminal feature: Optimizes responsiveness by caching disk lookups. Instead of crawling
+ *   directories in PATH (containing thousands of files) on every tab press, the cached Trie is reused.
+ *   The cache is dynamically invalidated and rebuilt if the PATH variable changes or if a 30s TTL expires.
+ */
 struct PathCache {
     trie: Trie,
     cached_path: String,
     last_updated: Instant,
 }
 
+/*
+ * PathCache Implementation Block
+ * - Handles lazy instantiation, TTL checking, and loading executable files into the Trie.
+ * - Terminal feature: Dynamically parses Unix/Windows executable files and handles cache refreshing.
+ */
 impl PathCache {
     fn new() -> Self {
         PathCache {
@@ -165,10 +195,21 @@ impl PathCache {
     }
 }
 
+/*
+ * BuiltinCompleter Struct
+ * - Implements rustyline's Completer helper trait, containing the cached PATH executables.
+ * - Terminal feature: Serves as the entry point for the shell's completion engine, resolving matches
+ *   for both commands/executables and local files/directories.
+ */
 pub struct BuiltinCompleter {
     cache: std::cell::RefCell<PathCache>,
 }
 
+/*
+ * BuiltinCompleter Implementation Block
+ * - Contains the instantiation helper for the completer.
+ * - Terminal feature: Integrates custom autocompletion with the shell's main input loop.
+ */
 impl BuiltinCompleter {
     pub fn new() -> Self {
         BuiltinCompleter {
