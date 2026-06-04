@@ -292,6 +292,7 @@ fn main() {
 
                         let child = Command::new(command)
                             .args(&args)
+                            .stdin(std::process::Stdio::inherit())
                             .stdout(stdout_stdio)
                             .stderr(stderr_stdio)
                             .spawn();
