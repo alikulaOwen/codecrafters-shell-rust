@@ -360,7 +360,7 @@ impl Completer for BuiltinCompleter {
         if is_command_position && !fragment.starts_with('.') && !fragment.starts_with('/') && !fragment.starts_with('~') {
             // Complete builtins and PATH executables
             let mut cache = self.cache.borrow_mut();
-            let trie = cache.get_executables(&["echo", "type", "exit", "pwd", "cd", "history", "cat"]);
+            let trie = cache.get_executables(&["echo", "type", "exit", "pwd", "cd", "history", "cat", "jobs"]);
             let mut matches = trie.get_words_with_prefix(&fragment);
             matches.sort();
 

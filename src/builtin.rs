@@ -25,7 +25,7 @@ pub fn run_builtin(
     stderr: &mut dyn Write,
     history: Option<&[String]>,
 ) -> bool {
-    const BUILTIN_CMDS: [&str; 6] = ["echo", "type", "exit", "pwd", "cd", "history"];
+    const BUILTIN_CMDS: [&str; 7] = ["echo", "type", "exit", "pwd", "cd", "history", "jobs"];
 
     match command {
         "exit" => exit(0),
